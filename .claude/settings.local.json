@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(node:*)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(del test-db-connection.js create-db.js)",
+      "Bash(rm:*)",
+      "Bash(mysql:*)",
+      "Bash(del test-db-connection.js)",
+      "WebFetch(domain:docs.payu.in)",
+      "WebSearch",
+      "Bash(mv:*)",
+      "Bash(npm install:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "defaultMode": "acceptEdits"
+  }
+}
