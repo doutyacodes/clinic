@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPayUService } from "@/lib/utils/payu";
 import { db } from "@/lib/db";
 import { payments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -55,26 +54,7 @@ export async function GET(request, { params }) {
       });
     }
 
-    // If not found in database, check with PayU
-    try {
-      const payuService = getPayUService();
-      const payuStatus = await payuService.checkTransactionStatus(txnId);
-
-      return NextResponse.json({
-        success: true,
-        payuResponse: payuStatus,
-        inDatabase: false,
-        note: "Payment found in PayU but not in our database. This might be a pending transaction.",
-      });
-    } catch (payuError) {
-      return NextResponse.json({
-        success: false,
-        error: "Transaction not found in database and PayU API call failed",
-        inDatabase: false,
-        payuError:
-          payuError instanceof Error ? payuError.message : "Unknown PayU error",
-      });
-    }
+    
   } catch (error) {
     console.error("Payment status check error:", error);
     return NextResponse.json(
