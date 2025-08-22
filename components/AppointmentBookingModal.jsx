@@ -43,9 +43,20 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
       [name]: value
     }));
     
-    // Clear prediction when changing booking type
-    if (name === 'bookingType') {
+    // Clear prediction when changing booking type or date
+    if (name === 'bookingType' || name === 'appointmentDate') {
       setPredictedToken(null);
+      setError(null);
+    }
+
+    // Validate date selection immediately
+    if (name === 'appointmentDate' && value) {
+      const selectedDate = new Date(value);
+      const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+      
+      if (session.dayOfWeek !== dayOfWeek) {
+        setError(`Doctor is not available on ${dayOfWeek}. Please select a ${session.dayOfWeek}.`);
+      }
     }
   };
 
@@ -53,17 +64,50 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
     setIsCalculating(true);
     setError(null);
     
+    if (!bookingData.appointmentDate) {
+      setError('Please select an appointment date first');
+      setIsCalculating(false);
+      return;
+    }
+
+    // Validate date is available for this session
+    const selectedDate = new Date(bookingData.appointmentDate);
+    const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+    
+    if (session.dayOfWeek !== dayOfWeek) {
+      setError(`Doctor is not available on ${dayOfWeek}. Available on ${session.dayOfWeek}`);
+      setIsCalculating(false);
+      return;
+    }
+    
     try {
-      // Simulate calculation (replace with actual API call)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Fetch existing bookings for this date and session
+      const existingBookingsResponse = await fetch(`/api/appointments/check-availability?sessionId=${session.id}&date=${bookingData.appointmentDate}`);
+      const existingBookingsData = await existingBookingsResponse.json();
       
-      let tokenNumber, estimatedTime;
+      if (!existingBookingsResponse.ok) {
+        throw new Error(existingBookingsData.error || 'Failed to check availability');
+      }
+
+      const existingTokens = existingBookingsData.bookedTokens || [];
+      const existingTimes = existingBookingsData.bookedTimes || [];
+      
+      let tokenNumber, estimatedTime, estimatedDateTime;
       
       switch (bookingData.bookingType) {
         case 'next':
-          // Get next available token
-          tokenNumber = (session.currentToken || 1) + 1;
+          // Get next available token (dynamic)
+          tokenNumber = 1;
+          while (existingTokens.includes(tokenNumber) && tokenNumber <= session.maxTokens) {
+            tokenNumber++;
+          }
+          if (tokenNumber > session.maxTokens) {
+            setError(`All tokens are booked for this date. Maximum ${session.maxTokens} tokens allowed.`);
+            setIsCalculating(false);
+            return;
+          }
           estimatedTime = calculateEstimatedTime(tokenNumber);
+          estimatedDateTime = formatEstimatedDateTime(estimatedTime);
           break;
           
         case 'time':
@@ -72,12 +116,43 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
             setIsCalculating(false);
             return;
           }
+
+          // Check if this time is already booked
+          const requestedTime = bookingData.preferredTime;
+          const timeConflict = existingTimes.find(bookedTime => {
+            const timeDiff = Math.abs(convertTimeToMinutes(bookedTime) - convertTimeToMinutes(requestedTime));
+            return timeDiff < (session.avgMinutesPerPatient || 15); // Within consultation window
+          });
+
+          if (timeConflict) {
+            setError(`Time slot ${requestedTime} is not available. Try a different time.`);
+            setIsCalculating(false);
+            return;
+          }
+
           // Calculate token based on time
           const timeInMinutes = convertTimeToMinutes(bookingData.preferredTime);
           const sessionStartMinutes = convertTimeToMinutes(session.startTime);
+          const sessionEndMinutes = convertTimeToMinutes(session.endTime);
+          
+          if (timeInMinutes < sessionStartMinutes || timeInMinutes > sessionEndMinutes) {
+            setError(`Please select a time between ${session.startTime} and ${session.endTime}`);
+            setIsCalculating(false);
+            return;
+          }
+
           const minutesFromStart = timeInMinutes - sessionStartMinutes;
           tokenNumber = Math.max(1, Math.ceil(minutesFromStart / (session.avgMinutesPerPatient || 15)));
+          
+          // Check if calculated token is available
+          if (existingTokens.includes(tokenNumber)) {
+            setError(`Token ${tokenNumber} for this time is already booked. Please choose a different time.`);
+            setIsCalculating(false);
+            return;
+          }
+          
           estimatedTime = bookingData.preferredTime;
+          estimatedDateTime = formatEstimatedDateTime(estimatedTime);
           break;
           
         case 'token':
@@ -86,13 +161,23 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
             setIsCalculating(false);
             return;
           }
+          
           tokenNumber = parseInt(bookingData.specificToken);
+          
+          if (existingTokens.includes(tokenNumber)) {
+            setError(`Token ${tokenNumber} is already booked for this date. Please choose a different token.`);
+            setIsCalculating(false);
+            return;
+          }
+          
           estimatedTime = calculateEstimatedTime(tokenNumber);
+          estimatedDateTime = formatEstimatedDateTime(estimatedTime);
           break;
           
         default:
           tokenNumber = 1;
           estimatedTime = session.startTime;
+          estimatedDateTime = formatEstimatedDateTime(estimatedTime);
       }
       
       // Validate token number
@@ -103,15 +188,56 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
         setPredictedToken({
           tokenNumber,
           estimatedTime,
-          isOverLimit: tokenNumber > session.maxTokens
+          estimatedDateTime,
+          isOverLimit: tokenNumber > session.maxTokens,
+          availableTokens: session.maxTokens - existingTokens.length
         });
       }
       
     } catch (err) {
-      setError('Failed to calculate token prediction');
+      console.error('Token calculation error:', err);
+      setError(err.message || 'Failed to calculate token prediction');
     } finally {
       setIsCalculating(false);
     }
+  };
+
+  const formatEstimatedDateTime = (time) => {
+    if (!bookingData.appointmentDate || !time) return time;
+    
+    const selectedDate = new Date(bookingData.appointmentDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    if (selectedDate.getTime() === today.getTime()) {
+      return `Today at ${time}`;
+    } else {
+      const dateStr = selectedDate.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      return `${dateStr} at ${time}`;
+    }
+  };
+
+  // Generate the next few available dates for this session
+  const getNextAvailableDates = () => {
+    const dates = [];
+    const today = new Date();
+    const sessionDayIndex = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].indexOf(session.dayOfWeek);
+    
+    for (let i = 0; i < 14; i++) { // Next 2 weeks
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      
+      if (date.getDay() === sessionDayIndex) {
+        dates.push(date.toISOString().split('T')[0]);
+      }
+    }
+    
+    return dates.slice(0, 4); // Return next 4 available dates
   };
 
   const convertTimeToMinutes = (timeString) => {
@@ -432,6 +558,43 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                   required
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400"
                 />
+                <p className="text-xs text-slate-500 mt-1">
+                  Doctor is available on {session.dayOfWeek}s from {session.startTime} to {session.endTime}
+                </p>
+                
+                {/* Quick Date Selection */}
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-slate-600 mb-2">Quick Select:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {getNextAvailableDates().map((date) => {
+                      const dateObj = new Date(date);
+                      const isToday = dateObj.toDateString() === new Date().toDateString();
+                      const dateLabel = isToday ? 'Today' : dateObj.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric' 
+                      });
+                      
+                      return (
+                        <button
+                          key={date}
+                          type="button"
+                          onClick={() => {
+                            setBookingData(prev => ({ ...prev, appointmentDate: date }));
+                            setPredictedToken(null);
+                            setError(null);
+                          }}
+                          className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                            bookingData.appointmentDate === date
+                              ? 'bg-sky-100 border-sky-300 text-sky-700'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-sky-200'
+                          }`}
+                        >
+                          {dateLabel}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -622,15 +785,21 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                         Token Prediction
                       </h4>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-slate-600">Token Number:</span>
                         <div className="font-bold text-lg">#{predictedToken.tokenNumber}</div>
                       </div>
                       <div>
                         <span className="text-slate-600">Estimated Time:</span>
-                        <div className="font-bold text-lg">{predictedToken.estimatedTime}</div>
+                        <div className="font-bold text-lg">{predictedToken.estimatedDateTime || predictedToken.estimatedTime}</div>
                       </div>
+                      {predictedToken.availableTokens !== undefined && (
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-600">Available Tokens:</span>
+                          <div className="font-medium text-green-600">{predictedToken.availableTokens} out of {session.maxTokens} remaining</div>
+                        </div>
+                      )}
                     </div>
                     {predictedToken.isOverLimit && (
                       <p className="text-red-600 text-xs mt-2">

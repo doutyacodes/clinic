@@ -11,7 +11,8 @@
       "WebFetch(domain:docs.payu.in)",
       "WebSearch",
       "Bash(mv:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run lint)"
     ],
     "deny": [],
     "ask": [],

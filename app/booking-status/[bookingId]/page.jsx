@@ -29,6 +29,10 @@ export default function BookingStatusPage() {
   const [error, setError] = useState(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [previousTokensAhead, setPreviousTokensAhead] = useState(null);
   const params = useParams();
   const router = useRouter();
   const bookingId = params.bookingId;
@@ -39,14 +43,76 @@ export default function BookingStatusPage() {
     }
   }, [bookingId]);
 
-  const fetchBookingStatus = async () => {
+  // Auto-refresh for today's appointments
+  useEffect(() => {
+    if (!booking || !autoRefresh || !booking.isToday || booking.status !== 'confirmed') {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      fetchBookingStatus(true); // Silent refresh
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [booking, autoRefresh]);
+
+  // Request notification permission
+  useEffect(() => {
+    if (booking?.isToday && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          setNotificationsEnabled(permission === 'granted');
+        });
+      } else {
+        setNotificationsEnabled(Notification.permission === 'granted');
+      }
+    }
+  }, [booking?.isToday]);
+
+  // Show notifications when queue position improves
+  useEffect(() => {
+    if (!booking?.queueStatus || !notificationsEnabled || previousTokensAhead === null) {
+      setPreviousTokensAhead(booking?.queueStatus?.tokensAhead);
+      return;
+    }
+
+    const currentTokensAhead = booking.queueStatus.tokensAhead;
+    
+    // Notify when position improves significantly or when it's almost their turn
+    if (previousTokensAhead > currentTokensAhead) {
+      if (currentTokensAhead === 0) {
+        new Notification('🎉 Your Turn!', {
+          body: 'Please proceed to the consultation room.',
+          icon: '/icon-192x192.png'
+        });
+      } else if (currentTokensAhead === 1) {
+        new Notification('⚡ You\'re Next!', {
+          body: 'Please be ready for your consultation.',
+          icon: '/icon-192x192.png'
+        });
+      } else if (currentTokensAhead <= 3) {
+        new Notification('🔔 Almost Your Turn', {
+          body: `Only ${currentTokensAhead} patients ahead of you.`,
+          icon: '/icon-192x192.png'
+        });
+      }
+    }
+
+    setPreviousTokensAhead(currentTokensAhead);
+  }, [booking?.queueStatus?.tokensAhead, notificationsEnabled, previousTokensAhead]);
+
+  const fetchBookingStatus = async (silent = false) => {
     try {
-      setIsLoading(true);
-      const response = await fetch(`/api/booking-status/${bookingId}`);
+      if (!silent) setIsLoading(true);
+      
+      // Use public API endpoint that doesn't require authentication
+      const response = await fetch(`/api/public/booking-status/${bookingId}`);
       const data = await response.json();
       
       if (response.ok) {
         setBooking(data.booking);
+        setLastUpdated(new Date(data.timestamp));
+        setError(null);
       } else {
         setError(data.error || 'Booking not found');
       }
@@ -54,7 +120,7 @@ export default function BookingStatusPage() {
       console.error('Error fetching booking:', error);
       setError('Failed to fetch booking status');
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -226,7 +292,13 @@ export default function BookingStatusPage() {
 
           <div className="text-center">
             <h1 className="text-4xl font-bold text-slate-800 mb-2">Booking Status</h1>
-            <p className="text-lg text-slate-600">Track your appointment details</p>
+            <p className="text-lg text-slate-600">Track your appointment details • No login required</p>
+            {booking?.isToday && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full text-sm font-medium">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                Live updates available for today's appointment
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -311,20 +383,179 @@ export default function BookingStatusPage() {
                 <Calendar size={32} className="text-blue-500 mx-auto mb-3" />
                 <p className="text-sm text-slate-500 mb-1">Appointment Date</p>
                 <p className="font-bold text-slate-800">{formatDate(booking.appointmentDate)}</p>
+                {booking.isToday && (
+                  <div className="mt-2 inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    Today
+                  </div>
+                )}
               </div>
 
               <div className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border border-green-100">
                 <Clock size={32} className="text-green-500 mx-auto mb-3" />
-                <p className="text-sm text-slate-500 mb-1">Time</p>
-                <p className="font-bold text-slate-800">{formatTime(booking.estimatedTime)}</p>
+                <p className="text-sm text-slate-500 mb-1">
+                  {booking.queueStatus?.updatedEstimatedTime ? 'Updated Time' : 'Estimated Time'}
+                </p>
+                <p className="font-bold text-slate-800">
+                  {booking.queueStatus?.updatedEstimatedTime || formatTime(booking.estimatedTime)}
+                </p>
+                {booking.queueStatus?.estimatedWaitingMinutes !== undefined && (
+                  <p className="text-xs text-green-600 mt-1">
+                    ~{booking.queueStatus.estimatedWaitingMinutes} min wait
+                  </p>
+                )}
               </div>
 
               <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-100">
                 <User size={32} className="text-purple-500 mx-auto mb-3" />
-                <p className="text-sm text-slate-500 mb-1">Token Number</p>
+                <p className="text-sm text-slate-500 mb-1">Your Token</p>
                 <p className="font-bold text-slate-800">#{booking.tokenNumber}</p>
+                {booking.queueStatus?.queuePosition && (
+                  <p className={`text-xs mt-1 font-medium ${
+                    booking.queueStatus.queuePosition === 'current' 
+                      ? 'text-green-600' 
+                      : 'text-orange-600'
+                  }`}>
+                    {booking.queueStatus.queuePosition === 'current' 
+                      ? 'Your turn!' 
+                      : `${booking.queueStatus.tokensAhead} ahead`}
+                  </p>
+                )}
               </div>
             </div>
+
+            {/* Real-time Queue Status - Only show if appointment is today */}
+            {booking.isToday && booking.queueStatus && booking.status === 'confirmed' && (
+              <motion.div 
+                className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-2xl p-6 mb-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                      <Clock size={24} className="text-white animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-800">Live Queue Status</h3>
+                      <p className="text-sm text-slate-600">Real-time updates every 30 seconds</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setAutoRefresh(!autoRefresh)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        autoRefresh 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {autoRefresh ? '🔄 Auto-refresh' : '⏸️ Paused'}
+                    </button>
+
+                    {('Notification' in window) && (
+                      <button
+                        onClick={() => {
+                          if (Notification.permission === 'default') {
+                            Notification.requestPermission().then(permission => {
+                              setNotificationsEnabled(permission === 'granted');
+                            });
+                          } else {
+                            setNotificationsEnabled(!notificationsEnabled);
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                          notificationsEnabled 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {notificationsEnabled ? '🔔 Notifications' : '🔕 Notify'}
+                      </button>
+                    )}
+                    
+                    {lastUpdated && (
+                      <p className="text-xs text-slate-500">
+                        Updated: {lastUpdated.toLocaleTimeString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-white/60 rounded-xl">
+                    <p className="text-sm text-slate-500 mb-1">Currently Serving</p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      #{booking.queueStatus.currentlyServing || booking.queueStatus.currentToken}
+                    </p>
+                  </div>
+                  
+                  <div className="text-center p-4 bg-white/60 rounded-xl">
+                    <p className="text-sm text-slate-500 mb-1">Your Position</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {booking.queueStatus.queuePosition === 'current' ? 'NOW' : booking.queueStatus.tokensAhead}
+                    </p>
+                  </div>
+                  
+                  <div className="text-center p-4 bg-white/60 rounded-xl">
+                    <p className="text-sm text-slate-500 mb-1">Completed Today</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {booking.queueStatus.completedToday}/{booking.queueStatus.totalTokensToday}
+                    </p>
+                  </div>
+                  
+                  <div className="text-center p-4 bg-white/60 rounded-xl">
+                    <p className="text-sm text-slate-500 mb-1">Est. Wait</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {booking.queueStatus.estimatedWaitingMinutes}m
+                    </p>
+                  </div>
+                </div>
+
+                {/* Queue Progress Bar */}
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-slate-600 mb-2">
+                    <span>Session Progress</span>
+                    <span>{Math.round((booking.queueStatus.completedToday / booking.queueStatus.totalTokensToday) * 100)}% Complete</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full transition-all duration-1000"
+                      style={{ 
+                        width: `${(booking.queueStatus.completedToday / booking.queueStatus.totalTokensToday) * 100}%` 
+                      }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Status Messages */}
+                <div className="mt-4 p-3 bg-white/60 rounded-xl">
+                  {booking.queueStatus.queuePosition === 'current' ? (
+                    <div className="flex items-center gap-2 text-green-700">
+                      <CheckCircle size={16} />
+                      <span className="font-medium">🎉 It's your turn! Please proceed to the consultation room.</span>
+                    </div>
+                  ) : booking.queueStatus.tokensAhead === 1 ? (
+                    <div className="flex items-center gap-2 text-yellow-700">
+                      <Clock size={16} />
+                      <span className="font-medium">⚡ You're next! Please be ready.</span>
+                    </div>
+                  ) : booking.queueStatus.tokensAhead <= 3 ? (
+                    <div className="flex items-center gap-2 text-orange-700">
+                      <AlertTriangle size={16} />
+                      <span className="font-medium">🔔 Almost your turn! Please be nearby.</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-blue-700">
+                      <Clock size={16} />
+                      <span className="font-medium">⏰ Please wait. We'll update your status as the queue moves.</span>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
 
             {/* Payment Info */}
             {booking.payment && (
@@ -389,6 +620,28 @@ export default function BookingStatusPage() {
               </p>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* Manual Refresh Button */}
+                <motion.button 
+                  onClick={() => fetchBookingStatus()}
+                  disabled={isLoading}
+                  className="flex items-center justify-center gap-2 bg-sky-500 text-white px-4 py-3 rounded-xl font-semibold hover:bg-sky-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isLoading ? (
+                    <Loader size={18} className="animate-spin" />
+                  ) : (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: 0 }}
+                      key={lastUpdated?.toISOString()} // Re-trigger animation on update
+                    >
+                      <Clock size={18} />
+                    </motion.div>
+                  )}
+                  {isLoading ? 'Refreshing...' : 'Refresh Status'}
+                </motion.button>
+
                 {/* Download Receipt - Only if payment is completed */}
                 {booking.payment?.status === 'completed' && (
                   <motion.button 

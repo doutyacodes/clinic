@@ -62,6 +62,20 @@ export async function POST(request) {
       );
     }
 
+    // Validate that the selected date is not in the past
+    const selectedDate = new Date(appointmentDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      return NextResponse.json(
+        { error: 'Cannot book appointments for past dates' },
+        { status: 400 }
+      );
+    }
+
+
     // Validate token number
     if (!tokenNumber || tokenNumber <= 0) {
       return NextResponse.json(
@@ -99,6 +113,15 @@ export async function POST(request) {
       );
     }
 
+    // Validate that the selected date matches the doctor's available day
+    const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+    if (session.dayOfWeek !== dayOfWeek) {
+      return NextResponse.json(
+        { error: `Doctor is not available on ${dayOfWeek}. Available on ${session.dayOfWeek}s from ${session.startTime} to ${session.endTime}` },
+        { status: 400 }
+      );
+    }
+
     // Validate token number against session limits
     if (tokenNumber > session.maxTokens) {
       // Allow booking but warn about overflow
@@ -122,19 +145,33 @@ export async function POST(request) {
       );
     }
 
-    // Check if the specific token is already taken for this session and date
-    const tokenConflict = await db.query.appointments.findFirst({
-      where: and(
+    // Check existing bookings for this session and date
+    const existingBookings = await db.select({
+      tokenNumber: appointments.tokenNumber,
+      estimatedTime: appointments.estimatedTime,
+      status: appointments.status,
+    }).from(appointments)
+      .where(and(
         eq(appointments.sessionId, sessionId),
         eq(appointments.appointmentDate, appointmentDate),
-        eq(appointments.tokenNumber, tokenNumber),
-        // Only check for non-cancelled appointments
-      ),
-    });
+      ));
 
-    if (tokenConflict && tokenConflict.status !== 'cancelled') {
+    // Filter active (non-cancelled) appointments
+    const activeBookings = existingBookings.filter(booking => booking.status !== 'cancelled');
+    const bookedTokens = activeBookings.map(booking => booking.tokenNumber);
+
+    // Check if the specific token is already taken
+    if (bookedTokens.includes(parseInt(tokenNumber))) {
       return NextResponse.json(
-        { error: `Token number ${tokenNumber} is already taken for this date` },
+        { error: `Token number ${tokenNumber} is already booked for this date. Available tokens: ${getAvailableTokensMessage(bookedTokens, session.maxTokens)}` },
+        { status: 400 }
+      );
+    }
+
+    // Additional validation: check if we're exceeding max tokens
+    if (activeBookings.length >= session.maxTokens) {
+      return NextResponse.json(
+        { error: `All ${session.maxTokens} tokens are booked for this date. Please choose a different date.` },
         { status: 400 }
       );
     }
@@ -244,6 +281,24 @@ function convertMinutesToTime(minutes) {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+}
+
+// Helper function to generate available tokens message
+function getAvailableTokensMessage(bookedTokens, maxTokens) {
+  const availableTokens = [];
+  for (let i = 1; i <= maxTokens; i++) {
+    if (!bookedTokens.includes(i)) {
+      availableTokens.push(i);
+    }
+  }
+  
+  if (availableTokens.length === 0) {
+    return 'None available';
+  } else if (availableTokens.length <= 5) {
+    return availableTokens.join(', ');
+  } else {
+    return `${availableTokens.slice(0, 3).join(', ')}, ... (${availableTokens.length} total)`;
+  }
 }
 
 async function generatePaymentUrl({ appointmentId, paymentId, transactionId, amount, userEmail, userName, productInfo }) {
