@@ -2,9 +2,11 @@
 import { NextResponse } from 'next/server';
 import { getRazorpayService } from '@/lib/utils/razorpay';
 import { db } from '@/lib/db/index.js';
-import { payments, appointments } from '@/lib/db/schema.js';
+import { payments, appointments, paymentReceipts, notifications } from '@/lib/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { getPDFService } from '@/lib/utils/pdf';
+import { getEmailService } from '@/lib/utils/email';
 
 export async function POST(request) {
   try {
@@ -158,8 +160,109 @@ export async function POST(request) {
             updatedAt: now,
           })
           .where(eq(appointments.id, appointmentId));
-        
+
         console.log('Appointment status updated to confirmed');
+
+        // Generate receipt number
+        const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+        // Generate PDF receipt
+        try {
+          const pdfService = getPDFService();
+          const receiptPdfBuffer = await pdfService.generateReceipt({
+            payment: paymentRecord,
+            appointment: appointment,
+            user: appointment.user,
+            doctor: appointment.doctor,
+            hospital: appointment.hospital,
+            receiptNumber,
+          });
+
+          console.log('PDF receipt generated successfully');
+
+          // Store receipt in database
+          const receiptId = nanoid();
+          await db.insert(paymentReceipts).values({
+            id: receiptId,
+            paymentId: paymentId,
+            receiptNumber,
+            receiptData: JSON.stringify({
+              receiptNumber,
+              paymentId,
+              appointmentId: appointment.id,
+              generatedAt: now.toISOString(),
+            }),
+            emailSent: false,
+            createdAt: now,
+          });
+
+          console.log('Receipt record saved to database');
+
+          // Send receipt email
+          try {
+            const emailService = getEmailService();
+            await emailService.sendPaymentReceipt({
+              user: appointment.user,
+              payment: paymentRecord,
+              appointment: appointment,
+              doctor: appointment.doctor,
+              hospital: appointment.hospital,
+              receiptPdfBuffer,
+            });
+
+            // Update receipt as emailed
+            await db.update(paymentReceipts)
+              .set({ emailSent: true })
+              .where(eq(paymentReceipts.id, receiptId));
+
+            console.log('Receipt email sent successfully');
+          } catch (emailError) {
+            console.error('Failed to send receipt email:', emailError);
+          }
+
+          // Send appointment confirmation email
+          try {
+            const emailService = getEmailService();
+            await emailService.sendAppointmentConfirmation({
+              user: appointment.user,
+              appointment: appointment,
+              doctor: appointment.doctor,
+              hospital: appointment.hospital,
+            });
+
+            console.log('Appointment confirmation email sent');
+          } catch (emailError) {
+            console.error('Failed to send appointment confirmation:', emailError);
+          }
+
+          // Create notification
+          try {
+            const notificationId = nanoid();
+            await db.insert(notifications).values({
+              id: notificationId,
+              userId: appointment.userId,
+              type: 'payment_success',
+              title: 'Payment Successful',
+              message: `Your payment of ₹${amount} has been received. Appointment confirmed for ${appointment.appointmentDate} with Dr. ${appointment.doctor.name}.`,
+              data: JSON.stringify({
+                paymentId,
+                appointmentId: appointment.id,
+                amount,
+                receiptNumber,
+              }),
+              isRead: false,
+              sentAt: now,
+              createdAt: now,
+            });
+
+            console.log('Notification created for payment success');
+          } catch (notifError) {
+            console.error('Failed to create notification:', notifError);
+          }
+
+        } catch (pdfError) {
+          console.error('Failed to generate receipt:', pdfError);
+        }
       }
 
     } catch (dbError) {

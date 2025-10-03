@@ -182,13 +182,23 @@ export default function HospitalDetailPage() {
           <div className="max-w-6xl mx-auto bg-white/90 backdrop-blur-xl rounded-3xl p-8 lg:p-12 shadow-2xl border border-white/20">
             <div className="flex flex-col lg:flex-row gap-8 items-start">
               <motion.div
-                className="text-8xl lg:text-9xl"
+                className="w-32 h-32 lg:w-40 lg:h-40 bg-gradient-to-br from-sky-100 to-blue-100 rounded-3xl flex items-center justify-center overflow-hidden flex-shrink-0"
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.4 }}
-                whileHover={{ scale: 1.05, rotate: 5 }}
+                whileHover={{ scale: 1.05 }}
               >
-                {hospital.image || "🏥"}
+                {hospital.image && (hospital.image.startsWith('http://') || hospital.image.startsWith('https://')) ? (
+                  <Image
+                    src={hospital.image}
+                    alt={hospital.name}
+                    width={160}
+                    height={160}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-6xl lg:text-8xl">{hospital.image || "🏥"}</span>
+                )}
               </motion.div>
 
               <div className="flex-1 space-y-6">

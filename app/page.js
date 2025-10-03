@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { 
-  Search, 
-  MapPin, 
-  Phone, 
-  Star, 
-  Calendar, 
-  Users, 
-  ChevronRight, 
+import {
+  Search,
+  MapPin,
+  Phone,
+  Star,
+  Calendar,
+  Users,
+  ChevronRight,
   Loader,
   Heart,
   Shield,
@@ -22,6 +22,7 @@ import {
   Play,
   CheckCircle
 } from "lucide-react";
+import Image from "next/image";
 
 export default function ModernHomePage() {
   const [query, setQuery] = useState("");
@@ -577,8 +578,18 @@ export default function ModernHomePage() {
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 via-blue-600 to-purple-600"></div>
                     
                     <div className="flex justify-between items-start mb-4">
-                      <div className="w-16 h-16 bg-gradient-to-br from-sky-100 to-blue-100 rounded-2xl flex items-center justify-center text-3xl">
-                        {hospital.image || "🏥"}
+                      <div className="w-16 h-16 bg-gradient-to-br from-sky-100 to-blue-100 rounded-2xl flex items-center justify-center overflow-hidden">
+                        {hospital.image && (hospital.image.startsWith('http://') || hospital.image.startsWith('https://')) ? (
+                          <Image
+                            src={hospital.image}
+                            alt={hospital.name}
+                            width={64}
+                            height={64}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-3xl">{hospital.image || "🏥"}</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full text-sm font-semibold">
                         <Star size={14} className="fill-current" />

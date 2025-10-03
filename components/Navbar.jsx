@@ -20,6 +20,7 @@ import {
   Plus
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import NotificationPanel from "./NotificationPanel";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -173,19 +174,7 @@ export default function Navbar() {
             ) : isAuthenticated ? (
               <>
                 {/* Modern Notifications */}
-                <motion.button
-                  className="relative p-3 text-slate-600 hover:text-sky-600 hover:bg-white/80 rounded-xl transition-all duration-300 group"
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Bell size={20} />
-                  <motion.span 
-                    className="absolute top-2 right-2 w-2 h-2 bg-gradient-to-r from-red-500 to-pink-500 rounded-full"
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-r from-sky-500/20 to-blue-500/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </motion.button>
+                <NotificationPanel />
 
                 {/* Enhanced Profile Dropdown */}
                 <div className="relative" ref={dropdownRef}>

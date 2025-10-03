@@ -4,6 +4,7 @@ import { users } from '@/lib/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { verifyToken } from '@/lib/auth/jwt.js';
 import { AUTH_CONFIG } from '@/lib/auth/config.js';
+import { calculateAge } from '@/lib/utils/helpers.js';
 
 export async function GET(request) {
   try {
@@ -49,6 +50,7 @@ export async function GET(request) {
       lastName: user.lastName,
       phone: user.phone,
       dateOfBirth: user.dateOfBirth,
+      age: calculateAge(user.dateOfBirth), // Calculate age from DOB
       gender: user.gender,
       address: user.address,
       city: user.city,
@@ -56,6 +58,7 @@ export async function GET(request) {
       zipCode: user.zipCode,
       bloodGroup: user.bloodGroup,
       allergies: user.allergies,
+      medicalHistory: user.medicalHistory,
       emergencyContact: user.emergencyContact,
       emergencyPhone: user.emergencyPhone,
       profileImage: user.profileImage,

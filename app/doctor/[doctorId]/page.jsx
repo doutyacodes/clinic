@@ -369,10 +369,17 @@ export default function DoctorDetailPage() {
                               </div>
 
                               <motion.button
-                                onClick={() => handleBookAppointment(session, { 
-                                  hospitalName: hospitalData.hospitalName,
-                                  hospitalId: hospitalData.hospitalId 
-                                })}
+                                onClick={() => {
+                                  const sessionWithHospital = {
+                                    ...session,
+                                    hospitalId: hospitalData.hospitalId,
+                                    hospitalName: hospitalData.hospitalName
+                                  };
+                                  handleBookAppointment(sessionWithHospital, {
+                                    hospitalName: hospitalData.hospitalName,
+                                    hospitalId: hospitalData.hospitalId
+                                  });
+                                }}
                                 disabled={session.availableSlots <= 0}
                                 className={`w-full py-2 px-4 rounded-xl font-semibold transition-all duration-200 ${
                                   session.availableSlots > 0

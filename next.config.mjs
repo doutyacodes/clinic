@@ -7,6 +7,11 @@ const nextConfig = {
         hostname: "images.pexels.com",
         pathname: "/**", // ✅ allow all paths
       },
+      {
+        protocol: "https",
+        hostname: "kottayammedicalcollege.org",
+        pathname: "/**", // ✅ allow all paths from this domain
+      },
     ],
   },
 };

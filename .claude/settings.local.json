@@ -12,7 +12,8 @@
       "WebSearch",
       "Bash(mv:*)",
       "Bash(npm install:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Read(//d/**)"
     ],
     "deny": [],
     "ask": [],

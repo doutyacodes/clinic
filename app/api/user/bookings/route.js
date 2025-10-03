@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db/index.js';
-import { appointments } from '@/lib/db/schema.js';
+import { appointments, payments } from '@/lib/db/schema.js';
 import { eq, desc } from 'drizzle-orm';
 import { verifyToken } from '@/lib/auth/jwt.js';
 import { AUTH_CONFIG } from '@/lib/auth/config.js';
@@ -40,10 +40,7 @@ export async function GET(request) {
         },
         hospital: true,
         session: true,
-        payments: {
-          orderBy: desc(appointments.createdAt),
-          limit: 1, // Get latest payment
-        },
+        payments: true, // Get all payments, we'll filter latest in JS
         medicalRecord: true,
       },
       orderBy: desc(appointments.appointmentDate),
@@ -86,14 +83,23 @@ export async function GET(request) {
         startTime: appointment.session.startTime,
         endTime: appointment.session.endTime,
       } : null,
-      payment: appointment.payments?.[0] ? {
-        id: appointment.payments[0].id,
-        amount: appointment.payments[0].amount,
-        status: appointment.payments[0].status,
-        transactionId: appointment.payments[0].transactionId,
-        gateway: appointment.payments[0].gateway,
-        paidAt: appointment.payments[0].paidAt,
-      } : null,
+      payment: appointment.payments && appointment.payments.length > 0 ? (() => {
+        // Get the latest payment (by createdAt or paidAt)
+        const latestPayment = appointment.payments.sort((a, b) => {
+          const dateA = new Date(b.paidAt || b.createdAt);
+          const dateB = new Date(a.paidAt || a.createdAt);
+          return dateB - dateA;
+        })[0];
+
+        return {
+          id: latestPayment.id,
+          amount: latestPayment.amount,
+          status: latestPayment.status,
+          transactionId: latestPayment.transactionId,
+          gateway: latestPayment.gateway,
+          paidAt: latestPayment.paidAt,
+        };
+      })() : null,
       medicalRecord: appointment.medicalRecord ? {
         id: appointment.medicalRecord.id,
         diagnosis: appointment.medicalRecord.diagnosis,
