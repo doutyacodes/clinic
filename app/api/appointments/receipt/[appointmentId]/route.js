@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 
 export async function GET(request, { params }) {
   try {
-    const { appointmentId } = params;
+    const { appointmentId } = await params;
 
     if (!appointmentId) {
       return NextResponse.json(
@@ -21,6 +21,7 @@ export async function GET(request, { params }) {
         user: true,
         doctor: true,
         hospital: true,
+        payments: true,
       },
     });
 
@@ -31,15 +32,21 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Get payment details
-    const payment = await db.query.payments.findFirst({
-      where: eq(payments.appointmentId, appointmentId),
-    });
+    // Get the latest completed payment
+    const payment = appointment.payments?.find(p => p.status === 'completed') ||
+                    appointment.payments?.[0];
 
-    if (!payment || payment.status !== 'completed') {
+    if (!payment) {
       return NextResponse.json(
-        { error: 'Payment not found or not completed' },
+        { error: 'Payment not found for this appointment' },
         { status: 404 }
+      );
+    }
+
+    if (payment.status !== 'completed') {
+      return NextResponse.json(
+        { error: 'Payment is not completed yet' },
+        { status: 400 }
       );
     }
 

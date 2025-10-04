@@ -62,19 +62,26 @@ export async function POST(request) {
       );
     }
 
+    // Validate booking type
+    if (bookingType && !['next', 'grid'].includes(bookingType)) {
+      return NextResponse.json(
+        { error: 'Invalid booking type. Only "next" and "grid" are allowed.' },
+        { status: 400 }
+      );
+    }
+
     // Validate that the selected date is not in the past
     const selectedDate = new Date(appointmentDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     selectedDate.setHours(0, 0, 0, 0);
-    
+
     if (selectedDate < today) {
       return NextResponse.json(
         { error: 'Cannot book appointments for past dates' },
         { status: 400 }
       );
     }
-
 
     // Validate token number
     if (!tokenNumber || tokenNumber <= 0) {

@@ -5,7 +5,7 @@ import { eq, and, gte } from 'drizzle-orm';
 
 export async function GET(request, { params }) {
   try {
-    const { bookingId } = params;
+    const { bookingId } = await params;
 
     if (!bookingId) {
       return NextResponse.json(
@@ -119,6 +119,7 @@ export async function GET(request, { params }) {
       consultationFee: booking.consultationFee,
       patientComplaints: booking.patientComplaints,
       createdAt: booking.createdAt,
+      sessionId: booking.sessionId,
       isToday,
       queueStatus,
       doctor: booking.doctor ? {

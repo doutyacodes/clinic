@@ -12,15 +12,24 @@ import {
   Loader,
   Lock,
   RefreshCw,
-  Grid as GridIcon,
+  Grid3x3 as GridIcon,
   Zap,
   Edit3
 } from "lucide-react";
 
 export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) {
+  // Debug: Log booking data
+  console.log('ModifyAppointmentModal - Booking data:', {
+    id: booking.id,
+    sessionId: booking.sessionId,
+    session: booking.session,
+    appointmentDate: booking.appointmentDate,
+    tokenNumber: booking.tokenNumber
+  });
+
   const [modifyData, setModifyData] = useState({
     appointmentDate: booking.appointmentDate,
-    modifyType: 'grid', // 'next', 'time', 'token', 'grid'
+    modifyType: 'grid', // 'next' or 'grid'
     preferredTime: '',
     specificToken: '',
   });
@@ -63,6 +72,20 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
     setLoadingTokens(true);
     setError(null);
 
+    // Validate date is selected
+    if (!modifyData.appointmentDate) {
+      setError('Please select a date first');
+      setLoadingTokens(false);
+      return;
+    }
+
+    // Validate session data exists
+    if (!booking.sessionId) {
+      setError('Session information is missing. Please refresh and try again.');
+      setLoadingTokens(false);
+      return;
+    }
+
     try {
       const response = await fetch(
         `/api/appointments/token-availability?sessionId=${booking.sessionId}&date=${modifyData.appointmentDate}`
@@ -71,11 +94,13 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
 
       if (response.ok) {
         setTokenAvailability(data.tokens || []);
+        console.log('Token availability loaded:', data.tokens?.length, 'tokens');
       } else {
         setError(data.error || 'Failed to load token availability');
+        console.error('Token availability API error:', data);
       }
     } catch (err) {
-      console.error('Token availability error:', err);
+      console.error('Token availability network error:', err);
       setError('Network error. Please try again.');
     } finally {
       setLoadingTokens(false);
@@ -114,6 +139,16 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
         setError(null);
       }
     }
+
+    // Validate date selection immediately
+    if (name === 'appointmentDate' && value) {
+      const selectedDate = new Date(value);
+      const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+      if (booking.session?.dayOfWeek && booking.session.dayOfWeek !== dayOfWeek) {
+        setError(`Doctor is not available on ${dayOfWeek}. Please select a ${booking.session.dayOfWeek}.`);
+      }
+    }
   };
 
   const calculateTokenPrediction = async () => {
@@ -122,6 +157,16 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
 
     if (!modifyData.appointmentDate) {
       setError('Please select an appointment date first');
+      setIsCalculating(false);
+      return;
+    }
+
+    // Validate date is available for this session
+    const selectedDate = new Date(modifyData.appointmentDate);
+    const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+    if (booking.session?.dayOfWeek && booking.session.dayOfWeek !== dayOfWeek) {
+      setError(`Doctor is not available on ${dayOfWeek}. Available on ${booking.session.dayOfWeek}`);
       setIsCalculating(false);
       return;
     }
@@ -150,7 +195,7 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
             tokenNumber++;
           }
           if (tokenNumber > booking.session.maxTokens) {
-            setError(`All tokens are booked for this date.`);
+            setError(`All tokens are booked for this date. Maximum ${booking.session.maxTokens} tokens allowed.`);
             setIsCalculating(false);
             return;
           }
@@ -158,44 +203,14 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
           estimatedDateTime = formatEstimatedDateTime(modifyData.appointmentDate, estimatedTime);
           break;
 
-        case 'time':
-          if (!modifyData.preferredTime) {
-            setError('Please select a preferred time');
-            setIsCalculating(false);
-            return;
-          }
-
-          const timeInMinutes = convertTimeToMinutes(modifyData.preferredTime);
-          const sessionStartMinutes = convertTimeToMinutes(booking.session.startTime);
-
-          const minutesFromStart = timeInMinutes - sessionStartMinutes;
-          tokenNumber = Math.max(1, Math.ceil(minutesFromStart / (booking.session.avgMinutesPerPatient || 15)));
-
-          if (existingTokens.includes(tokenNumber)) {
-            setError(`Token ${tokenNumber} for this time is already booked.`);
-            setIsCalculating(false);
-            return;
-          }
-
-          estimatedTime = modifyData.preferredTime;
-          estimatedDateTime = formatEstimatedDateTime(modifyData.appointmentDate, estimatedTime);
-          break;
-
-        case 'token':
+        case 'grid':
+          // Grid mode handles token selection separately via handleTokenSelect
           if (!modifyData.specificToken) {
-            setError('Please enter a token number');
+            setError('Please select a token from the grid');
             setIsCalculating(false);
             return;
           }
-
           tokenNumber = parseInt(modifyData.specificToken);
-
-          if (existingTokens.includes(tokenNumber)) {
-            setError(`Token ${tokenNumber} is already booked.`);
-            setIsCalculating(false);
-            return;
-          }
-
           estimatedTime = calculateEstimatedTime(tokenNumber);
           estimatedDateTime = formatEstimatedDateTime(modifyData.appointmentDate, estimatedTime);
           break;
@@ -226,6 +241,17 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
   };
 
   const formatEstimatedDateTime = (date, time) => {
+    // Handle both single parameter (for backward compatibility) and two parameters
+    if (!date && !time) {
+      return '';
+    }
+
+    // If only one parameter, treat it as time with current appointmentDate
+    if (!time && date) {
+      time = date;
+      date = modifyData.appointmentDate;
+    }
+
     if (!date || !time) return time;
 
     const selectedDate = new Date(date);
@@ -521,14 +547,12 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
             <label className="block text-sm font-medium text-slate-700 mb-3">
               How would you like to modify?
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                { value: 'next', label: 'Next', desc: 'Auto assign' },
-                { value: 'time', label: 'Time', desc: 'Pick time' },
-                { value: 'token', label: 'Token', desc: 'Type number' },
-                { value: 'grid', label: 'Grid', desc: 'Visual select' }
+                { value: 'next', label: 'Next Available Token', desc: 'Get the next available slot automatically', icon: 'Zap' },
+                { value: 'grid', label: 'Select from Grid', desc: 'Choose your preferred time slot visually', icon: 'Grid' }
               ].map((option) => (
-                <label key={option.value} className="flex items-center p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-purple-300 transition-colors">
+                <label key={option.value} className="flex items-center p-4 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-purple-400 hover:bg-purple-50/50 transition-all duration-200">
                   <input
                     type="radio"
                     name="modifyType"
@@ -537,58 +561,30 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
                     onChange={handleInputChange}
                     className="sr-only"
                   />
-                  <div className={`w-4 h-4 border-2 rounded-full mr-3 flex-shrink-0 ${
+                  <div className={`w-5 h-5 border-2 rounded-full mr-3 flex-shrink-0 flex items-center justify-center ${
                     modifyData.modifyType === option.value ? 'border-purple-500 bg-purple-500' : 'border-slate-300'
                   }`}>
                     {modifyData.modifyType === option.value && (
-                      <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
+                      <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
                     )}
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-slate-800">{option.label}</div>
-                    <div className="text-xs text-slate-500">{option.desc}</div>
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className={`p-2 rounded-lg ${modifyData.modifyType === option.value ? 'bg-purple-100' : 'bg-slate-100'}`}>
+                      {option.icon === 'Zap' ? (
+                        <Zap size={20} className={modifyData.modifyType === option.value ? 'text-purple-600' : 'text-slate-600'} />
+                      ) : (
+                        <GridIcon size={20} className={modifyData.modifyType === option.value ? 'text-purple-600' : 'text-slate-600'} />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800">{option.label}</div>
+                      <div className="text-xs text-slate-500">{option.desc}</div>
+                    </div>
                   </div>
                 </label>
               ))}
             </div>
           </div>
-
-          {/* Time Input */}
-          {modifyData.modifyType === 'time' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Preferred Time
-              </label>
-              <input
-                type="time"
-                name="preferredTime"
-                value={modifyData.preferredTime}
-                onChange={handleInputChange}
-                min={booking.session?.startTime}
-                max={booking.session?.endTime}
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400"
-              />
-            </div>
-          )}
-
-          {/* Token Input */}
-          {modifyData.modifyType === 'token' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Token Number
-              </label>
-              <input
-                type="number"
-                name="specificToken"
-                value={modifyData.specificToken}
-                onChange={handleInputChange}
-                min="1"
-                max={booking.session?.maxTokens}
-                placeholder="Enter token number"
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400"
-              />
-            </div>
-          )}
 
           {/* Token Grid */}
           {modifyData.modifyType === 'grid' && (
@@ -738,9 +734,7 @@ export default function ModifyAppointmentModal({ booking, onClose, onSuccess }) 
             <button
               type="button"
               onClick={calculateTokenPrediction}
-              disabled={isCalculating || !modifyData.appointmentDate ||
-                (modifyData.modifyType === 'time' && !modifyData.preferredTime) ||
-                (modifyData.modifyType === 'token' && !modifyData.specificToken)}
+              disabled={isCalculating || !modifyData.appointmentDate}
               className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
             >
               {isCalculating ? (

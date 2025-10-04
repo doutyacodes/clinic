@@ -31,6 +31,14 @@ export async function PUT(request) {
       );
     }
 
+    // Validate modify type
+    if (modifyType && !['next', 'grid'].includes(modifyType)) {
+      return NextResponse.json(
+        { error: 'Invalid modify type. Only "next" and "grid" are allowed.' },
+        { status: 400 }
+      );
+    }
+
     // Fetch existing appointment
     const existingAppointment = await db.query.appointments.findFirst({
       where: eq(appointments.id, appointmentId),

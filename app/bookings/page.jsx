@@ -3,24 +3,35 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  MapPin, 
-  Phone, 
+import {
+  Calendar,
+  Clock,
+  User,
+  MapPin,
+  Phone,
   Star,
   CreditCard,
   FileText,
   Download,
-  Filter,
   Search,
   ChevronRight,
   AlertCircle,
   CheckCircle,
   XCircle,
-  Loader,
-  RefreshCw
+  RefreshCw,
+  Building2,
+  Activity,
+  Timer,
+  Users,
+  TrendingUp,
+  Navigation,
+  DoorClosed,
+  Stethoscope,
+  Hash,
+  Info,
+  Heart,
+  MessageSquare,
+  Eye
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -45,7 +56,6 @@ export default function BookingsPage() {
       if (isAuthenticated) {
         fetchBookings();
       } else {
-        // Show public access option or redirect to login
         setLoading(false);
       }
     }
@@ -55,10 +65,10 @@ export default function BookingsPage() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch('/api/user/bookings');
       const data = await response.json();
-      
+
       if (data.success) {
         setBookings(data.bookings);
       } else {
@@ -71,121 +81,49 @@ export default function BookingsPage() {
     }
   };
 
-  const handlePayNow = async (appointmentId) => {
-    try {
-      const response = await fetch('/api/payment/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appointmentId })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.paymentUrl) {
-          window.location.href = data.paymentUrl;
-        } else if (data.paymentData) {
-          // For PayU integration, submit form
-          const form = document.createElement('form');
-          form.method = 'POST';
-          form.action = data.paymentData.action;
-          
-          Object.keys(data.paymentData.params).forEach(key => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = data.paymentData.params[key];
-            form.appendChild(input);
-          });
-          
-          document.body.appendChild(form);
-          form.submit();
-        }
-      } else {
-        alert('Payment initiation failed. Please try again.');
-      }
-    } catch (error) {
-      console.error('Payment error:', error);
-      alert('Payment failed. Please try again.');
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'confirmed': return <CheckCircle size={20} className="text-green-500" />;
-      case 'completed': return <CheckCircle size={20} className="text-blue-500" />;
-      case 'cancelled': return <XCircle size={20} className="text-red-500" />;
-      case 'pending': return <Clock size={20} className="text-yellow-500" />;
-      default: return <AlertCircle size={20} className="text-gray-500" />;
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'confirmed': return 'bg-green-100 text-green-800';
-      case 'completed': return 'bg-blue-100 text-blue-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const getStatusConfig = (status) => {
+    const configs = {
+      confirmed: { label: 'Active', color: 'green', icon: CheckCircle },
+      completed: { label: 'Completed', color: 'blue', icon: CheckCircle },
+      cancelled: { label: 'Cancelled', color: 'red', icon: XCircle },
+      pending: { label: 'Pending', color: 'yellow', icon: Clock },
+      no_show: { label: 'No-Show', color: 'orange', icon: AlertCircle },
+      rescheduled: { label: 'Rescheduled', color: 'purple', icon: RefreshCw }
+    };
+    return configs[status] || configs.pending;
   };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     });
   };
 
   const formatTime = (timeString) => {
     if (!timeString) return 'Not specified';
-    return new Date(`2000-01-01T${timeString}`).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
+    return timeString;
   };
 
-  const filteredBookings = bookings[selectedTab]?.filter(booking => 
+  const filteredBookings = bookings[selectedTab]?.filter(booking =>
     booking.doctor?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     booking.hospital?.name?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
   const tabs = [
-    { id: 'upcoming', label: 'Upcoming', count: bookings.upcoming?.length || 0 },
-    { id: 'completed', label: 'Completed', count: bookings.completed?.length || 0 },
-    { id: 'cancelled', label: 'Cancelled', count: bookings.cancelled?.length || 0 },
-    { id: 'pending', label: 'Pending', count: bookings.pending?.length || 0 },
+    { id: 'upcoming', label: 'Upcoming', count: bookings.upcoming?.length || 0, color: 'sky' },
+    { id: 'completed', label: 'Completed', count: bookings.completed?.length || 0, color: 'blue' },
+    { id: 'cancelled', label: 'Cancelled', count: bookings.cancelled?.length || 0, color: 'red' },
+    { id: 'pending', label: 'Pending', count: bookings.pending?.length || 0, color: 'yellow' },
   ];
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut"
-      }
-    }
-  };
 
   if (isLoading || (isAuthenticated && loading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <motion.div 
+        <motion.div
           className="text-center p-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -201,21 +139,17 @@ export default function BookingsPage() {
     );
   }
 
-  // Show public access for non-authenticated users
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 opacity-70 z-0" 
-             style={{
-               background: `
-                 radial-gradient(circle at 20% 30%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
-                 radial-gradient(circle at 80% 70%, rgba(56, 189, 248, 0.06) 0%, transparent 40%),
-                 radial-gradient(circle at 40% 90%, rgba(125, 211, 252, 0.05) 0%, transparent 30%)
-               `
-             }} />
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-40">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-sky-300 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
+          <div className="absolute top-40 right-10 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000" />
+          <div className="absolute bottom-20 left-1/2 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000" />
+        </div>
 
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
-          <motion.div 
+          <motion.div
             className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 max-w-md w-full text-center"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -226,7 +160,7 @@ export default function BookingsPage() {
             <p className="text-slate-600 mb-6">
               To view your complete booking history, please sign in to your account.
             </p>
-            
+
             <div className="space-y-4">
               <button
                 onClick={() => router.push('/login')}
@@ -234,13 +168,13 @@ export default function BookingsPage() {
               >
                 Sign In to View Bookings
               </button>
-              
+
               <div className="flex items-center gap-4">
                 <hr className="flex-1 border-slate-200" />
                 <span className="text-sm text-slate-500">OR</span>
                 <hr className="flex-1 border-slate-200" />
               </div>
-              
+
               <div className="text-left">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Have an Appointment ID?
@@ -277,65 +211,64 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 relative">
-      {/* Background patterns */}
-      <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 opacity-70 z-0" 
-           style={{
-             background: `
-               radial-gradient(circle at 20% 30%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
-               radial-gradient(circle at 80% 70%, rgba(56, 189, 248, 0.06) 0%, transparent 40%),
-               radial-gradient(circle at 40% 90%, rgba(125, 211, 252, 0.05) 0%, transparent 30%)
-             `
-           }} />
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 relative overflow-hidden py-8">
+      {/* Animated Background */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute top-20 left-10 w-96 h-96 bg-sky-300 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
+        <div className="absolute top-40 right-10 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000" />
+        <div className="absolute bottom-20 left-1/2 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000" />
+      </div>
 
       <div className="relative z-10">
         {/* Header */}
-        <motion.header 
-          className="p-8 text-center"
+        <motion.header
+          className="px-4 sm:px-6 lg:px-8 mb-8"
           initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
-          <h1 className="text-4xl font-bold text-slate-800 mb-2">My Bookings</h1>
-          <p className="text-slate-600 text-lg">Track your appointments and medical consultations</p>
+          <div className="max-w-7xl mx-auto text-center">
+            <h1 className="text-4xl sm:text-5xl font-bold text-slate-800 mb-2">My Appointments</h1>
+            <p className="text-slate-600 text-lg">Track and manage your healthcare bookings</p>
+          </div>
         </motion.header>
 
-        <div className="max-w-7xl mx-auto px-4 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Search and Filters */}
-          <motion.div 
-            className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-lg border border-white/20 mb-8"
+          <motion.div
+            className="card-futuristic p-4 sm:p-6 mb-6"
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-              <div className="flex-1 min-w-[300px]">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <div className="flex-1 w-full sm:min-w-[300px]">
                 <div className="relative">
                   <Search size={20} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search by doctor or hospital name..."
+                    placeholder="Search by doctor or hospital..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl bg-white/70 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 transition-all duration-200"
                   />
                 </div>
               </div>
-              
+
               <button
                 onClick={fetchBookings}
-                className="flex items-center gap-2 bg-sky-500 text-white px-4 py-3 rounded-xl hover:bg-sky-600 transition-colors duration-200"
+                className="flex items-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200"
                 disabled={loading}
               >
                 <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                Refresh
+                <span className="hidden sm:inline">Refresh</span>
               </button>
             </div>
           </motion.div>
 
           {/* Tabs */}
-          <motion.div 
-            className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-lg border border-white/20 mb-8"
+          <motion.div
+            className="card-futuristic p-4 sm:p-6 mb-6"
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.3 }}
@@ -345,19 +278,19 @@ export default function BookingsPage() {
                 <motion.button
                   key={tab.id}
                   onClick={() => setSelectedTab(tab.id)}
-                  className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 ${
+                  className={`px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 ${
                     selectedTab === tab.id
-                      ? 'bg-sky-500 text-white shadow-lg'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg scale-105'
+                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
                   }`}
-                  whileHover={{ scale: 1.02 }}
+                  whileHover={{ scale: selectedTab === tab.id ? 1.05 : 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  {tab.label}
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                  <span className="text-sm sm:text-base">{tab.label}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                     selectedTab === tab.id
                       ? 'bg-white/20 text-white'
-                      : 'bg-slate-200 text-slate-600'
+                      : 'bg-slate-100 text-slate-600'
                   }`}>
                     {tab.count}
                   </span>
@@ -370,7 +303,7 @@ export default function BookingsPage() {
           <AnimatePresence>
             {error && (
               <motion.div
-                className="bg-red-50 border border-red-200 rounded-3xl p-6 shadow-lg mb-8"
+                className="bg-red-50 border border-red-200 rounded-2xl p-6 shadow-lg mb-6"
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
@@ -387,23 +320,19 @@ export default function BookingsPage() {
           </AnimatePresence>
 
           {/* Bookings List */}
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="space-y-6"
-          >
+          <div className="space-y-4 sm:space-y-6">
             {filteredBookings.length === 0 ? (
-              <motion.div 
-                className="bg-white/90 backdrop-blur-xl rounded-3xl p-12 shadow-lg border border-white/20 text-center"
-                variants={itemVariants}
+              <motion.div
+                className="card-futuristic p-12 text-center"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
               >
                 <div className="text-6xl mb-4">📅</div>
                 <h3 className="text-xl font-semibold text-slate-800 mb-2">
                   No {selectedTab} bookings found
                 </h3>
                 <p className="text-slate-600 mb-6">
-                  {searchQuery 
+                  {searchQuery
                     ? `No bookings match your search "${searchQuery}"`
                     : `You don't have any ${selectedTab} appointments yet.`
                   }
@@ -416,228 +345,205 @@ export default function BookingsPage() {
                 </button>
               </motion.div>
             ) : (
-              filteredBookings.map((booking) => (
-                <motion.div
-                  key={booking.id}
-                  className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-lg border border-white/20 hover:shadow-xl transition-all duration-300"
-                  variants={itemVariants}
-                  whileHover={{ y: -5 }}
-                >
-                  <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Booking Info */}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="text-xl font-bold text-slate-800 mb-1">
-                            {booking.doctor?.name}
-                          </h3>
-                          <p className="text-sky-600 font-medium">{booking.doctor?.specialty}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(booking.status)}
-                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(booking.status)}`}>
-                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                          </span>
-                        </div>
-                      </div>
+              filteredBookings.map((booking, index) => {
+                const statusConfig = getStatusConfig(booking.status);
+                const StatusIcon = statusConfig.icon;
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div className="flex items-center gap-3">
-                          <MapPin size={18} className="text-slate-400" />
-                          <div>
-                            <p className="text-sm text-slate-500">Hospital</p>
-                            <p className="font-medium text-slate-800">{booking.hospital?.name}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <Calendar size={18} className="text-slate-400" />
-                          <div>
-                            <p className="text-sm text-slate-500">Date & Time</p>
-                            <p className="font-medium text-slate-800">
-                              {formatDate(booking.appointmentDate)}
-                            </p>
-                            <p className="text-sm text-slate-600">
-                              {formatTime(booking.estimatedTime)} (Token #{booking.tokenNumber})
-                            </p>
-                          </div>
-                        </div>
-
-                        {booking.payment && (
-                          <div className="flex items-center gap-3">
-                            <CreditCard size={18} className="text-slate-400" />
+                return (
+                  <motion.div
+                    key={booking.id}
+                    className="card-futuristic p-4 sm:p-6 hover:shadow-2xl transition-all duration-300"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    whileHover={{ y: -5 }}
+                  >
+                    <div className="flex flex-col lg:flex-row gap-6">
+                      {/* Main Info */}
+                      <div className="flex-1 space-y-4">
+                        {/* Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-gradient-to-br from-sky-100 to-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                              <Stethoscope size={24} className="text-sky-600" />
+                            </div>
                             <div>
-                              <p className="text-sm text-slate-500">Payment</p>
-                              <p className="font-medium text-slate-800">
-                                ₹{booking.payment.amount}
+                              <h3 className="text-xl font-bold text-slate-800">
+                                {booking.doctor?.name}
+                              </h3>
+                              <p className="text-sky-600 font-medium">{booking.doctor?.specialty}</p>
+                              {booking.doctor?.qualification && (
+                                <p className="text-xs text-slate-500 mt-1">{booking.doctor.qualification}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-${statusConfig.color}-50 border border-${statusConfig.color}-200`}>
+                            <StatusIcon size={16} className={`text-${statusConfig.color}-600`} />
+                            <span className={`text-sm font-semibold text-${statusConfig.color}-700`}>
+                              {statusConfig.label}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Details Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {/* Hospital */}
+                          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                            <Building2 size={18} className="text-sky-600 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs text-slate-500">Hospital</p>
+                              <p className="font-semibold text-slate-800 truncate">{booking.hospital?.name}</p>
+                            </div>
+                          </div>
+
+                          {/* Token Number */}
+                          <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-xl">
+                            <Hash size={18} className="text-purple-600 flex-shrink-0" />
+                            <div>
+                              <p className="text-xs text-slate-500">Token Number</p>
+                              <p className="font-bold text-lg text-purple-700">#{booking.tokenNumber}</p>
+                            </div>
+                          </div>
+
+                          {/* Date */}
+                          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
+                            <Calendar size={18} className="text-blue-600 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs text-slate-500">Appointment Date</p>
+                              <p className="font-semibold text-slate-800 text-sm truncate">
+                                {formatDate(booking.appointmentDate)}
                               </p>
-                              <p className={`text-sm ${
-                                booking.payment.status === 'completed' 
-                                  ? 'text-green-600' 
-                                  : 'text-red-600'
-                              }`}>
-                                {booking.payment.status}
-                              </p>
+                            </div>
+                          </div>
+
+                          {/* Time */}
+                          <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
+                            <Clock size={18} className="text-green-600 flex-shrink-0" />
+                            <div>
+                              <p className="text-xs text-slate-500">Estimated Time</p>
+                              <p className="font-semibold text-slate-800">{formatTime(booking.estimatedTime)}</p>
+                            </div>
+                          </div>
+
+                          {/* Payment Status */}
+                          {booking.payment && (
+                            <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl">
+                              <CreditCard size={18} className="text-amber-600 flex-shrink-0" />
+                              <div>
+                                <p className="text-xs text-slate-500">Payment</p>
+                                <p className="font-bold text-slate-800">₹{booking.payment.amount}</p>
+                                <p className={`text-xs ${
+                                  booking.payment.status === 'completed'
+                                    ? 'text-green-600'
+                                    : 'text-amber-600'
+                                }`}>
+                                  {booking.payment.status === 'completed' ? '✓ Paid' : 'Pending'}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Doctor Rating */}
+                          {booking.doctor?.rating && (
+                            <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-xl">
+                              <Star size={18} className="text-yellow-600 flex-shrink-0 fill-current" />
+                              <div>
+                                <p className="text-xs text-slate-500">Doctor Rating</p>
+                                <p className="font-bold text-slate-800">{booking.doctor.rating} / 5</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Additional Info */}
+                        {booking.patientComplaints && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                            <div className="flex items-start gap-2">
+                              <MessageSquare size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-blue-700 mb-1">Your Symptoms</p>
+                                <p className="text-sm text-blue-600">{booking.patientComplaints}</p>
+                              </div>
                             </div>
                           </div>
                         )}
-
-                        <div className="flex items-center gap-3">
-                          <Star size={18} className="text-slate-400" />
-                          <div>
-                            <p className="text-sm text-slate-500">Doctor Rating</p>
-                            <div className="flex items-center gap-1">
-                              <Star size={14} className="text-yellow-500 fill-current" />
-                              <span className="font-medium text-slate-800">
-                                {booking.doctor?.rating}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
                       </div>
 
-                      {booking.doctorNotes && (
-                        <div className="bg-blue-50 rounded-xl p-4 mb-4">
-                          <div className="flex items-start gap-2">
-                            <FileText size={18} className="text-blue-500 mt-0.5" />
-                            <div>
-                              <p className="font-medium text-blue-800 mb-1">Doctor's Notes</p>
-                              <p className="text-blue-700 text-sm">{booking.doctorNotes}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-3 lg:w-48">
-                      <motion.button
-                        onClick={() => router.push(`/booking-status/${booking.id}`)}
-                        className="bg-sky-500 text-white px-4 py-2 rounded-xl hover:bg-sky-600 transition-colors duration-200 flex items-center justify-center gap-2"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <FileText size={16} />
-                        View Details
-                      </motion.button>
-
-                      {booking.payment?.status === 'completed' && (
+                      {/* Actions */}
+                      <div className="flex lg:flex-col gap-2 lg:w-48">
                         <motion.button
-                          onClick={async () => {
-                            try {
-                              const response = await fetch(`/api/appointments/receipt/${booking.id}`);
-                              if (response.ok) {
-                                const blob = await response.blob();
-                                const url = window.URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `receipt-${booking.id}.html`;
-                                document.body.appendChild(a);
-                                a.click();
-                                window.URL.revokeObjectURL(url);
-                                document.body.removeChild(a);
-                              } else {
-                                alert('Failed to download receipt');
-                              }
-                            } catch (error) {
-                              console.error('Download error:', error);
-                              alert('Failed to download receipt');
-                            }
-                          }}
-                          className="border border-slate-300 text-slate-600 px-4 py-2 rounded-xl hover:bg-slate-50 transition-colors duration-200 flex items-center justify-center gap-2"
+                          onClick={() => router.push(`/booking-status/${booking.id}`)}
+                          className="flex-1 lg:w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                         >
-                          <Download size={16} />
-                          Receipt
+                          <Eye size={16} />
+                          View Details
                         </motion.button>
-                      )}
 
-                      {booking.status === 'pending' && !booking.payment && (
-                        <motion.button
-                          onClick={() => handlePayNow(booking.id)}
-                          className="bg-green-500 text-white px-4 py-2 rounded-xl hover:bg-green-600 transition-colors duration-200 flex items-center justify-center gap-2"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <CreditCard size={16} />
-                          Pay Now
-                        </motion.button>
-                      )}
-
-                      {booking.status === 'confirmed' && (
-                        <motion.button
-                          onClick={async () => {
-                            if (confirm('Are you sure you want to cancel this appointment?')) {
+                        {booking.payment?.status === 'completed' && (
+                          <motion.button
+                            onClick={async () => {
                               try {
-                                const response = await fetch('/api/appointments/cancel', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ appointmentId: booking.id })
-                                });
+                                const response = await fetch(`/api/appointments/receipt/${booking.id}`);
                                 if (response.ok) {
-                                  alert('Appointment cancelled successfully');
-                                  fetchBookings(); // Refresh the list
+                                  const blob = await response.blob();
+                                  const url = window.URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = `receipt-${booking.id}.pdf`;
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  window.URL.revokeObjectURL(url);
+                                  document.body.removeChild(a);
                                 } else {
-                                  const data = await response.json();
-                                  alert(data.error || 'Failed to cancel appointment');
+                                  alert('Failed to download receipt');
                                 }
                               } catch (error) {
-                                console.error('Cancel error:', error);
-                                alert('Failed to cancel appointment');
+                                console.error('Download error:', error);
+                                alert('Failed to download receipt');
                               }
-                            }
-                          }}
-                          className="border border-red-300 text-red-600 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors duration-200 flex items-center justify-center gap-2"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <XCircle size={16} />
-                          Cancel
-                        </motion.button>
-                      )}
-
-                      {booking.status === 'completed' && !booking.medicalRecord && (
-                        <motion.button
-                          className="bg-green-500 text-white px-4 py-2 rounded-xl hover:bg-green-600 transition-colors duration-200 flex items-center justify-center gap-2"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <Star size={16} />
-                          Rate Doctor
-                        </motion.button>
-                      )}
+                            }}
+                            className="flex-1 lg:w-full border-2 border-purple-300 text-purple-600 px-4 py-2.5 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-200 flex items-center justify-center gap-2"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <Download size={16} />
+                            Receipt
+                          </motion.button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))
+                  </motion.div>
+                );
+              })
             )}
-          </motion.div>
+          </div>
 
-          {/* Total Stats */}
+          {/* Stats Summary */}
           {bookings.all?.length > 0 && (
-            <motion.div 
-              className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-lg border border-white/20 mt-8"
+            <motion.div
+              className="card-futuristic p-6 mt-8"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.5 }}
             >
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
-                <div>
-                  <p className="text-2xl font-bold text-sky-500">{bookings.all.length}</p>
-                  <p className="text-slate-600 text-sm">Total Bookings</p>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="text-center p-4 bg-gradient-to-br from-sky-50 to-blue-50 rounded-xl">
+                  <p className="text-3xl font-bold text-sky-600">{bookings.all.length}</p>
+                  <p className="text-slate-600 text-sm mt-1">Total Bookings</p>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-green-500">{bookings.completed?.length || 0}</p>
-                  <p className="text-slate-600 text-sm">Completed</p>
+                <div className="text-center p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl">
+                  <p className="text-3xl font-bold text-green-600">{bookings.completed?.length || 0}</p>
+                  <p className="text-slate-600 text-sm mt-1">Completed</p>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-blue-500">{bookings.upcoming?.length || 0}</p>
-                  <p className="text-slate-600 text-sm">Upcoming</p>
+                <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl">
+                  <p className="text-3xl font-bold text-blue-600">{bookings.upcoming?.length || 0}</p>
+                  <p className="text-slate-600 text-sm mt-1">Upcoming</p>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-yellow-500">{bookings.pending?.length || 0}</p>
-                  <p className="text-slate-600 text-sm">Pending</p>
+                <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl">
+                  <p className="text-3xl font-bold text-yellow-600">{bookings.pending?.length || 0}</p>
+                  <p className="text-slate-600 text-sm mt-1">Pending</p>
                 </div>
               </div>
             </motion.div>

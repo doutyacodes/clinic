@@ -29,8 +29,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
     patientComplaints: '',
     emergencyContact: '',
     emergencyPhone: '',
-    bookingType: 'next', // 'next', 'time', 'token', 'grid'
-    preferredTime: '',
+    bookingType: 'next', // 'next' or 'grid'
     specificToken: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -177,71 +176,20 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
           estimatedTime = calculateEstimatedTime(tokenNumber);
           estimatedDateTime = formatEstimatedDateTime(estimatedTime);
           break;
-          
-        case 'time':
-          if (!bookingData.preferredTime) {
-            setError('Please select a preferred time');
-            setIsCalculating(false);
-            return;
-          }
 
-          // Check if this time is already booked
-          const requestedTime = bookingData.preferredTime;
-          const timeConflict = existingTimes.find(bookedTime => {
-            const timeDiff = Math.abs(convertTimeToMinutes(bookedTime) - convertTimeToMinutes(requestedTime));
-            return timeDiff < (session.avgMinutesPerPatient || 15); // Within consultation window
-          });
-
-          if (timeConflict) {
-            setError(`Time slot ${requestedTime} is not available. Try a different time.`);
-            setIsCalculating(false);
-            return;
-          }
-
-          // Calculate token based on time
-          const timeInMinutes = convertTimeToMinutes(bookingData.preferredTime);
-          const sessionStartMinutes = convertTimeToMinutes(session.startTime);
-          const sessionEndMinutes = convertTimeToMinutes(session.endTime);
-          
-          if (timeInMinutes < sessionStartMinutes || timeInMinutes > sessionEndMinutes) {
-            setError(`Please select a time between ${session.startTime} and ${session.endTime}`);
-            setIsCalculating(false);
-            return;
-          }
-
-          const minutesFromStart = timeInMinutes - sessionStartMinutes;
-          tokenNumber = Math.max(1, Math.ceil(minutesFromStart / (session.avgMinutesPerPatient || 15)));
-          
-          // Check if calculated token is available
-          if (existingTokens.includes(tokenNumber)) {
-            setError(`Token ${tokenNumber} for this time is already booked. Please choose a different time.`);
-            setIsCalculating(false);
-            return;
-          }
-          
-          estimatedTime = bookingData.preferredTime;
-          estimatedDateTime = formatEstimatedDateTime(estimatedTime);
-          break;
-          
-        case 'token':
+        case 'grid':
+          // Grid mode handles token selection separately via handleTokenSelect
+          // This case is here for completeness but grid bypasses calculateTokenPrediction
           if (!bookingData.specificToken) {
-            setError('Please enter a token number');
+            setError('Please select a token from the grid');
             setIsCalculating(false);
             return;
           }
-          
           tokenNumber = parseInt(bookingData.specificToken);
-          
-          if (existingTokens.includes(tokenNumber)) {
-            setError(`Token ${tokenNumber} is already booked for this date. Please choose a different token.`);
-            setIsCalculating(false);
-            return;
-          }
-          
           estimatedTime = calculateEstimatedTime(tokenNumber);
           estimatedDateTime = formatEstimatedDateTime(estimatedTime);
           break;
-          
+
         default:
           tokenNumber = 1;
           estimatedTime = session.startTime;
@@ -698,8 +646,8 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                 <label className="block text-sm font-medium text-slate-700 mb-3">
                   How would you like to book your appointment?
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <label className="flex items-center p-3 sm:p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-sky-300 transition-colors">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-center p-4 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-sky-400 hover:bg-sky-50/50 transition-all duration-200">
                     <input
                       type="radio"
                       name="bookingType"
@@ -708,64 +656,25 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                       onChange={handleInputChange}
                       className="sr-only"
                     />
-                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex-shrink-0 ${
+                    <div className={`w-5 h-5 border-2 rounded-full mr-3 flex-shrink-0 flex items-center justify-center ${
                       bookingData.bookingType === 'next' ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
                     }`}>
                       {bookingData.bookingType === 'next' && (
-                        <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
+                        <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
                       )}
                     </div>
-                    <div>
-                      <div className="text-sm font-medium text-slate-800">Next</div>
-                      <div className="text-xs text-slate-500">Auto assign</div>
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className={`p-2 rounded-lg ${bookingData.bookingType === 'next' ? 'bg-sky-100' : 'bg-slate-100'}`}>
+                        <Zap size={20} className={bookingData.bookingType === 'next' ? 'text-sky-600' : 'text-slate-600'} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800">Next Available Token</div>
+                        <div className="text-xs text-slate-500">Get the next available slot automatically</div>
+                      </div>
                     </div>
                   </label>
 
-                  <label className="flex items-center p-3 sm:p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-sky-300 transition-colors">
-                    <input
-                      type="radio"
-                      name="bookingType"
-                      value="time"
-                      checked={bookingData.bookingType === 'time'}
-                      onChange={handleInputChange}
-                      className="sr-only"
-                    />
-                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex-shrink-0 ${
-                      bookingData.bookingType === 'time' ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
-                    }`}>
-                      {bookingData.bookingType === 'time' && (
-                        <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-slate-800">Time</div>
-                      <div className="text-xs text-slate-500">Pick time</div>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center p-3 sm:p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-sky-300 transition-colors">
-                    <input
-                      type="radio"
-                      name="bookingType"
-                      value="token"
-                      checked={bookingData.bookingType === 'token'}
-                      onChange={handleInputChange}
-                      className="sr-only"
-                    />
-                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex-shrink-0 ${
-                      bookingData.bookingType === 'token' ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
-                    }`}>
-                      {bookingData.bookingType === 'token' && (
-                        <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-slate-800">Token</div>
-                      <div className="text-xs text-slate-500">Type number</div>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center p-3 sm:p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-sky-300 transition-colors">
+                  <label className="flex items-center p-4 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-sky-400 hover:bg-sky-50/50 transition-all duration-200">
                     <input
                       type="radio"
                       name="bookingType"
@@ -774,63 +683,25 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                       onChange={handleInputChange}
                       className="sr-only"
                     />
-                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex-shrink-0 ${
+                    <div className={`w-5 h-5 border-2 rounded-full mr-3 flex-shrink-0 flex items-center justify-center ${
                       bookingData.bookingType === 'grid' ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
                     }`}>
                       {bookingData.bookingType === 'grid' && (
-                        <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
+                        <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
                       )}
                     </div>
-                    <div>
-                      <div className="text-sm font-medium text-slate-800">Grid</div>
-                      <div className="text-xs text-slate-500">Visual select</div>
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className={`p-2 rounded-lg ${bookingData.bookingType === 'grid' ? 'bg-sky-100' : 'bg-slate-100'}`}>
+                        <GridIcon size={20} className={bookingData.bookingType === 'grid' ? 'text-sky-600' : 'text-slate-600'} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800">Select from Grid</div>
+                        <div className="text-xs text-slate-500">Choose your preferred time slot visually</div>
+                      </div>
                     </div>
                   </label>
                 </div>
               </div>
-
-              {/* Time Input for 'time' booking type */}
-              {bookingData.bookingType === 'time' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Preferred Time
-                  </label>
-                  <input
-                    type="time"
-                    name="preferredTime"
-                    value={bookingData.preferredTime}
-                    onChange={handleInputChange}
-                    min={session.startTime}
-                    max={session.endTime}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Session time: {session.startTime} - {session.endTime}
-                  </p>
-                </div>
-              )}
-
-              {/* Token Input for 'token' booking type */}
-              {bookingData.bookingType === 'token' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Token Number
-                  </label>
-                  <input
-                    type="number"
-                    name="specificToken"
-                    value={bookingData.specificToken}
-                    onChange={handleInputChange}
-                    min="1"
-                    max={session.maxTokens}
-                    placeholder="Enter token number"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Available tokens: 1 - {session.maxTokens}
-                  </p>
-                </div>
-              )}
 
               {/* Token Grid for 'grid' booking type */}
               {bookingData.bookingType === 'grid' && (
