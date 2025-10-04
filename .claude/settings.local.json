@@ -13,7 +13,8 @@
       "Bash(mv:*)",
       "Bash(npm install:*)",
       "Bash(npm run lint)",
-      "Read(//d/**)"
+      "Read(//d/**)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": [],

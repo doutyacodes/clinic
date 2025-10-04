@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter } from 'next/navigation';
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  MapPin, 
-  Phone, 
+import {
+  Calendar,
+  Clock,
+  User,
+  MapPin,
+  Phone,
   Star,
   CreditCard,
   FileText,
@@ -20,8 +20,10 @@ import {
   Stethoscope,
   Download,
   X,
-  Loader
+  Loader,
+  Edit3
 } from 'lucide-react';
+import ModifyAppointmentModal from '@/components/ModifyAppointmentModal';
 
 export default function BookingStatusPage() {
   const [booking, setBooking] = useState(null);
@@ -33,6 +35,7 @@ export default function BookingStatusPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [previousTokensAhead, setPreviousTokensAhead] = useState(null);
+  const [showModifyModal, setShowModifyModal] = useState(false);
   const params = useParams();
   const router = useRouter();
   const bookingId = params.bookingId;
@@ -159,7 +162,7 @@ export default function BookingStatusPage() {
     try {
       setIsDownloading(true);
       const response = await fetch(`/api/appointments/receipt/${bookingId}`);
-      
+
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -180,6 +183,12 @@ export default function BookingStatusPage() {
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handleModifySuccess = (updatedBooking) => {
+    setBooking(updatedBooking);
+    setShowModifyModal(false);
+    fetchBookingStatus(); // Refresh the booking data
   };
 
   const getStatusIcon = (status) => {
@@ -619,9 +628,9 @@ export default function BookingStatusPage() {
                 Keep this booking ID for your records: <span className="font-mono font-semibold text-slate-700">{booking.id}</span>
               </p>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 {/* Manual Refresh Button */}
-                <motion.button 
+                <motion.button
                   onClick={() => fetchBookingStatus()}
                   disabled={isLoading}
                   className="flex items-center justify-center gap-2 bg-sky-500 text-white px-4 py-3 rounded-xl font-semibold hover:bg-sky-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -642,9 +651,22 @@ export default function BookingStatusPage() {
                   {isLoading ? 'Refreshing...' : 'Refresh Status'}
                 </motion.button>
 
+                {/* Modify Appointment - Only if confirmed or pending */}
+                {['confirmed', 'pending'].includes(booking.status) && (
+                  <motion.button
+                    onClick={() => setShowModifyModal(true)}
+                    className="flex items-center justify-center gap-2 bg-purple-500 text-white px-4 py-3 rounded-xl font-semibold hover:bg-purple-600 transition-all duration-300"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Edit3 size={18} />
+                    Modify Appointment
+                  </motion.button>
+                )}
+
                 {/* Download Receipt - Only if payment is completed */}
                 {booking.payment?.status === 'completed' && (
-                  <motion.button 
+                  <motion.button
                     onClick={handleDownloadReceipt}
                     disabled={isDownloading}
                     className="flex items-center justify-center gap-2 bg-green-500 text-white px-4 py-3 rounded-xl font-semibold hover:bg-green-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -662,7 +684,7 @@ export default function BookingStatusPage() {
 
                 {/* Cancel Appointment - Only if confirmed */}
                 {booking.status === 'confirmed' && (
-                  <motion.button 
+                  <motion.button
                     onClick={handleCancelBooking}
                     disabled={isCancelling}
                     className="flex items-center justify-center gap-2 bg-red-500 text-white px-4 py-3 rounded-xl font-semibold hover:bg-red-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -679,7 +701,7 @@ export default function BookingStatusPage() {
                 )}
 
                 {/* Print Details */}
-                <motion.button 
+                <motion.button
                   onClick={() => window.print()}
                   className="flex items-center justify-center gap-2 bg-slate-500 text-white px-4 py-3 rounded-xl font-semibold hover:bg-slate-600 transition-all duration-300"
                   whileHover={{ scale: 1.02 }}
@@ -690,7 +712,7 @@ export default function BookingStatusPage() {
                 </motion.button>
 
                 {/* Book Another Appointment */}
-                <motion.button 
+                <motion.button
                   onClick={() => router.push('/')}
                   className="flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white px-4 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
                   whileHover={{ scale: 1.02 }}
@@ -703,6 +725,17 @@ export default function BookingStatusPage() {
             </div>
           </div>
         </motion.div>
+
+        {/* Modify Appointment Modal */}
+        <AnimatePresence>
+          {showModifyModal && booking && (
+            <ModifyAppointmentModal
+              booking={booking}
+              onClose={() => setShowModifyModal(false)}
+              onSuccess={handleModifySuccess}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

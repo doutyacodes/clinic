@@ -1,21 +1,25 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Clock, 
-  Calendar, 
-  User, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  CreditCard, 
-  X, 
-  CheckCircle, 
+import {
+  Clock,
+  Calendar,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  CreditCard,
+  X,
+  CheckCircle,
   AlertCircle,
   Loader,
   Heart,
-  Hash
+  Hash,
+  Lock,
+  RefreshCw,
+  Grid as GridIcon,
+  Zap
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -25,7 +29,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
     patientComplaints: '',
     emergencyContact: '',
     emergencyPhone: '',
-    bookingType: 'next', // 'next', 'time', 'token'
+    bookingType: 'next', // 'next', 'time', 'token', 'grid'
     preferredTime: '',
     specificToken: ''
   });
@@ -36,16 +40,80 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
   const [isCalculating, setIsCalculating] = useState(false);
   const { user } = useAuth();
 
+  // Token Grid States
+  const [tokenAvailability, setTokenAvailability] = useState([]);
+  const [loadingTokens, setLoadingTokens] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [selectedToken, setSelectedToken] = useState(null);
+
+  // Fetch token availability when date is selected and booking type is 'grid'
+  useEffect(() => {
+    if (bookingData.bookingType === 'grid' && bookingData.appointmentDate && session?.id) {
+      fetchTokenAvailability();
+    }
+  }, [bookingData.bookingType, bookingData.appointmentDate, session?.id]);
+
+  // Auto-refresh token grid every 30 seconds if enabled
+  useEffect(() => {
+    if (autoRefresh && bookingData.bookingType === 'grid' && bookingData.appointmentDate && session?.id) {
+      const interval = setInterval(() => {
+        fetchTokenAvailability();
+      }, 30000); // 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh, bookingData.bookingType, bookingData.appointmentDate, session?.id]);
+
+  const fetchTokenAvailability = async () => {
+    setLoadingTokens(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/appointments/token-availability?sessionId=${session.id}&date=${bookingData.appointmentDate}`
+      );
+      const data = await response.json();
+
+      if (response.ok) {
+        setTokenAvailability(data.tokens || []);
+      } else {
+        setError(data.error || 'Failed to load token availability');
+      }
+    } catch (err) {
+      console.error('Token availability error:', err);
+      setError('Network error. Please try again.');
+    } finally {
+      setLoadingTokens(false);
+    }
+  };
+
+  const handleTokenSelect = (token) => {
+    if (token.status === 'available') {
+      setSelectedToken(token);
+      setPredictedToken({
+        tokenNumber: token.tokenNumber,
+        estimatedTime: token.estimatedTime,
+        estimatedDateTime: formatEstimatedDateTime(bookingData.appointmentDate, token.estimatedTime)
+      });
+      setBookingData(prev => ({
+        ...prev,
+        specificToken: token.tokenNumber.toString()
+      }));
+      setError(null);
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setBookingData(prev => ({
       ...prev,
       [name]: value
     }));
-    
+
     // Clear prediction when changing booking type or date
     if (name === 'bookingType' || name === 'appointmentDate') {
       setPredictedToken(null);
+      setSelectedToken(null);
+      setTokenAvailability([]);
       setError(null);
     }
 
@@ -53,7 +121,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
     if (name === 'appointmentDate' && value) {
       const selectedDate = new Date(value);
       const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
-      
+
       if (session.dayOfWeek !== dayOfWeek) {
         setError(`Doctor is not available on ${dayOfWeek}. Please select a ${session.dayOfWeek}.`);
       }
@@ -202,21 +270,29 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
     }
   };
 
-  const formatEstimatedDateTime = (time) => {
-    if (!bookingData.appointmentDate || !time) return time;
-    
-    const selectedDate = new Date(bookingData.appointmentDate);
+  const formatEstimatedDateTime = (date, time) => {
+    if (!date && !time) {
+      // Fallback to old signature
+      const actualTime = date || time;
+      if (!bookingData.appointmentDate || !actualTime) return actualTime;
+      date = bookingData.appointmentDate;
+      time = actualTime;
+    }
+
+    if (!date || !time) return time;
+
+    const selectedDate = new Date(date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     selectedDate.setHours(0, 0, 0, 0);
-    
+
     if (selectedDate.getTime() === today.getTime()) {
       return `Today at ${time}`;
     } else {
-      const dateStr = selectedDate.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
-        day: 'numeric' 
+      const dateStr = selectedDate.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
       });
       return `${dateStr} at ${time}`;
     }
@@ -622,7 +698,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                 <label className="block text-sm font-medium text-slate-700 mb-3">
                   How would you like to book your appointment?
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <label className="flex items-center p-3 sm:p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-sky-300 transition-colors">
                     <input
                       type="radio"
@@ -632,7 +708,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                       onChange={handleInputChange}
                       className="sr-only"
                     />
-                    <div className={`w-4 h-4 border-2 rounded-full mr-3 ${
+                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex-shrink-0 ${
                       bookingData.bookingType === 'next' ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
                     }`}>
                       {bookingData.bookingType === 'next' && (
@@ -640,8 +716,8 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                       )}
                     </div>
                     <div>
-                      <div className="text-sm sm:text-base font-medium text-slate-800">Next Available</div>
-                      <div className="text-xs text-slate-500">Get the next token</div>
+                      <div className="text-sm font-medium text-slate-800">Next</div>
+                      <div className="text-xs text-slate-500">Auto assign</div>
                     </div>
                   </label>
 
@@ -654,7 +730,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                       onChange={handleInputChange}
                       className="sr-only"
                     />
-                    <div className={`w-4 h-4 border-2 rounded-full mr-3 ${
+                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex-shrink-0 ${
                       bookingData.bookingType === 'time' ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
                     }`}>
                       {bookingData.bookingType === 'time' && (
@@ -662,8 +738,8 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                       )}
                     </div>
                     <div>
-                      <div className="text-sm sm:text-base font-medium text-slate-800">By Time</div>
-                      <div className="text-xs text-slate-500">Choose preferred time</div>
+                      <div className="text-sm font-medium text-slate-800">Time</div>
+                      <div className="text-xs text-slate-500">Pick time</div>
                     </div>
                   </label>
 
@@ -676,7 +752,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                       onChange={handleInputChange}
                       className="sr-only"
                     />
-                    <div className={`w-4 h-4 border-2 rounded-full mr-3 ${
+                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex-shrink-0 ${
                       bookingData.bookingType === 'token' ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
                     }`}>
                       {bookingData.bookingType === 'token' && (
@@ -684,8 +760,30 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                       )}
                     </div>
                     <div>
-                      <div className="text-sm sm:text-base font-medium text-slate-800">Specific Token</div>
-                      <div className="text-xs text-slate-500">Choose token number</div>
+                      <div className="text-sm font-medium text-slate-800">Token</div>
+                      <div className="text-xs text-slate-500">Type number</div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center p-3 sm:p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-sky-300 transition-colors">
+                    <input
+                      type="radio"
+                      name="bookingType"
+                      value="grid"
+                      checked={bookingData.bookingType === 'grid'}
+                      onChange={handleInputChange}
+                      className="sr-only"
+                    />
+                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex-shrink-0 ${
+                      bookingData.bookingType === 'grid' ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
+                    }`}>
+                      {bookingData.bookingType === 'grid' && (
+                        <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-slate-800">Grid</div>
+                      <div className="text-xs text-slate-500">Visual select</div>
                     </div>
                   </label>
                 </div>
@@ -734,31 +832,181 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                 </div>
               )}
 
-              {/* Calculate Button */}
-              <button
-                type="button"
-                onClick={calculateTokenPrediction}
-                disabled={isCalculating || !bookingData.appointmentDate || 
-                  (bookingData.bookingType === 'time' && !bookingData.preferredTime) ||
-                  (bookingData.bookingType === 'token' && !bookingData.specificToken)}
-                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
-              >
-                {isCalculating ? (
-                  <>
-                    <motion.div
-                      className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    />
-                    Calculating...
-                  </>
-                ) : (
-                  <>
-                    <Hash size={18} />
-                    Calculate Token & Time
-                  </>
-                )}
-              </button>
+              {/* Token Grid for 'grid' booking type */}
+              {bookingData.bookingType === 'grid' && (
+                <div className="space-y-4">
+                  {!bookingData.appointmentDate ? (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
+                      <AlertCircle size={24} className="text-yellow-600 mx-auto mb-2" />
+                      <p className="text-sm text-yellow-700 font-medium">
+                        Please select an appointment date first
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Grid Header with Auto Refresh */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-semibold text-slate-800">Select Token</h4>
+                          <p className="text-xs text-slate-500">Click on an available token to select</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={fetchTokenAvailability}
+                            disabled={loadingTokens}
+                            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Refresh availability"
+                          >
+                            <RefreshCw size={16} className={`text-slate-600 ${loadingTokens ? 'animate-spin' : ''}`} />
+                          </button>
+                          <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={autoRefresh}
+                              onChange={(e) => setAutoRefresh(e.target.checked)}
+                              className="w-4 h-4 text-sky-500 rounded border-slate-300 focus:ring-sky-400"
+                            />
+                            Auto refresh
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Token Grid */}
+                      {loadingTokens ? (
+                        <div className="flex items-center justify-center py-12">
+                          <motion.div
+                            className="w-8 h-8 border-4 border-slate-200 border-t-sky-500 rounded-full"
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          />
+                        </div>
+                      ) : tokenAvailability.length > 0 ? (
+                        <>
+                          {/* Statistics */}
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-center">
+                              <div className="font-bold text-green-700">
+                                {tokenAvailability.filter(t => t.status === 'available').length}
+                              </div>
+                              <div className="text-green-600">Available</div>
+                            </div>
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-center">
+                              <div className="font-bold text-red-700">
+                                {tokenAvailability.filter(t => t.status === 'booked').length}
+                              </div>
+                              <div className="text-red-600">Booked</div>
+                            </div>
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 text-center">
+                              <div className="font-bold text-yellow-700">
+                                {tokenAvailability.filter(t => t.status === 'locked').length}
+                              </div>
+                              <div className="text-yellow-600">Locked</div>
+                            </div>
+                          </div>
+
+                          {/* Grid of Tokens */}
+                          <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-64 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200">
+                            {tokenAvailability.map((token) => (
+                              <motion.button
+                                key={token.tokenNumber}
+                                type="button"
+                                onClick={() => handleTokenSelect(token)}
+                                disabled={!token.isAvailable}
+                                className={`
+                                  relative aspect-square rounded-lg font-semibold text-sm
+                                  transition-all duration-200
+                                  ${token.status === 'available'
+                                    ? 'bg-green-100 border-2 border-green-300 text-green-700 hover:bg-green-200 hover:scale-105 cursor-pointer'
+                                    : token.status === 'booked'
+                                    ? 'bg-red-100 border-2 border-red-300 text-red-400 cursor-not-allowed opacity-60'
+                                    : 'bg-yellow-100 border-2 border-yellow-300 text-yellow-400 cursor-not-allowed opacity-60'
+                                  }
+                                  ${selectedToken?.tokenNumber === token.tokenNumber
+                                    ? 'ring-4 ring-sky-400 scale-105 bg-sky-500 border-sky-600 text-white'
+                                    : ''
+                                  }
+                                `}
+                                whileHover={token.isAvailable ? { scale: 1.05 } : {}}
+                                whileTap={token.isAvailable ? { scale: 0.95 } : {}}
+                              >
+                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                  <div className="text-lg font-bold">
+                                    {token.tokenNumber}
+                                  </div>
+                                  <div className="text-[10px] mt-0.5 opacity-75">
+                                    {token.estimatedTime}
+                                  </div>
+                                </div>
+                                {!token.isAvailable && (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <Lock size={12} className="opacity-50" />
+                                  </div>
+                                )}
+                              </motion.button>
+                            ))}
+                          </div>
+
+                          {/* Legend */}
+                          <div className="flex flex-wrap gap-4 text-xs">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 bg-green-100 border-2 border-green-300 rounded"></div>
+                              <span className="text-slate-600">Available</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 bg-red-100 border-2 border-red-300 rounded opacity-60"></div>
+                              <span className="text-slate-600">Booked</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 bg-yellow-100 border-2 border-yellow-300 rounded opacity-60"></div>
+                              <span className="text-slate-600">Locked (5 min)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 bg-sky-500 border-2 border-sky-600 rounded ring-2 ring-sky-300"></div>
+                              <span className="text-slate-600">Selected</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
+                          <GridIcon size={32} className="text-slate-400 mx-auto mb-2" />
+                          <p className="text-sm text-slate-600">
+                            Click refresh to load token availability
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Calculate Button - Hidden for grid mode */}
+              {bookingData.bookingType !== 'grid' && (
+                <button
+                  type="button"
+                  onClick={calculateTokenPrediction}
+                  disabled={isCalculating || !bookingData.appointmentDate ||
+                    (bookingData.bookingType === 'time' && !bookingData.preferredTime) ||
+                    (bookingData.bookingType === 'token' && !bookingData.specificToken)}
+                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  {isCalculating ? (
+                    <>
+                      <motion.div
+                        className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      />
+                      Calculating...
+                    </>
+                  ) : (
+                    <>
+                      <Hash size={18} />
+                      Calculate Token & Time
+                    </>
+                  )}
+                </button>
+              )}
 
               {/* Token Prediction Display */}
               <AnimatePresence>
@@ -847,6 +1095,14 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
 
           {/* Submit Buttons */}
           <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-slate-200">
+            {/* Grid mode helper text */}
+            {bookingData.bookingType === 'grid' && !predictedToken && bookingData.appointmentDate && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700 text-center">
+                <Zap size={16} className="inline mr-2" />
+                Select a token from the grid above to continue
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isSubmitting || !predictedToken}
