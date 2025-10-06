@@ -99,7 +99,7 @@ export default function BookingStatusPage() {
     }
   }, [booking?.isToday]);
 
-  // Show notifications when queue position improves
+  // Show notifications when queue position improves or doctor status changes
   useEffect(() => {
     if (!booking?.queueStatus || !notificationsEnabled || previousTokensAhead === null) {
       setPreviousTokensAhead(booking?.queueStatus?.tokensAhead);
@@ -107,28 +107,37 @@ export default function BookingStatusPage() {
     }
 
     const currentTokensAhead = booking.queueStatus.tokensAhead;
+    const patientName = booking.patientName || `${booking.user?.firstName || 'Patient'} ${booking.user?.lastName || ''}`.trim();
+    const doctorStatus = booking.doctor?.status || 'offline';
+    const doctorStatusConfig = getDoctorStatusConfig(doctorStatus);
 
     if (previousTokensAhead > currentTokensAhead) {
       if (currentTokensAhead === 0) {
-        new Notification('🎉 Your Turn!', {
-          body: 'Please proceed to the consultation room.',
-          icon: '/icon-192x192.png'
+        new Notification(`🎉 ${patientName} - Your Turn!`, {
+          body: `Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. Please proceed to consultation room.`,
+          icon: '/icon-192x192.png',
+          badge: '/icon-192x192.png',
+          tag: 'queue-update'
         });
       } else if (currentTokensAhead === 1) {
-        new Notification('⚡ You\'re Next!', {
-          body: 'Please be ready for your consultation.',
-          icon: '/icon-192x192.png'
+        new Notification(`⚡ ${patientName} - You're Next!`, {
+          body: `Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. Token #${booking.tokenNumber}`,
+          icon: '/icon-192x192.png',
+          badge: '/icon-192x192.png',
+          tag: 'queue-update'
         });
       } else if (currentTokensAhead <= 3) {
-        new Notification('🔔 Almost Your Turn', {
-          body: `Only ${currentTokensAhead} patients ahead of you.`,
-          icon: '/icon-192x192.png'
+        new Notification(`🔔 ${patientName} - Almost Your Turn`, {
+          body: `Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. Current: #${booking.queueStatus.currentToken}, Your Token: #${booking.tokenNumber}`,
+          icon: '/icon-192x192.png',
+          badge: '/icon-192x192.png',
+          tag: 'queue-update'
         });
       }
     }
 
     setPreviousTokensAhead(currentTokensAhead);
-  }, [booking?.queueStatus?.tokensAhead, notificationsEnabled, previousTokensAhead]);
+  }, [booking?.queueStatus?.tokensAhead, booking?.doctor?.status, notificationsEnabled, previousTokensAhead]);
 
   const fetchBookingStatus = async (silent = false) => {
     if (!silent) {
@@ -426,14 +435,43 @@ export default function BookingStatusPage() {
                     <StatusIcon size={32} className={statusConfig.textColor} />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-800">#{booking.tokenNumber}</h2>
-                    <p className={`text-sm font-semibold ${statusConfig.textColor}`}>
+                    <h2 className="text-2xl font-bold text-slate-800">
+                      {booking.patientName || `${booking.user?.firstName || 'Patient'} ${booking.user?.lastName || ''}`.trim()}
+                    </h2>
+                    <p className={`text-lg font-bold ${statusConfig.textColor}`}>
+                      Token #{booking.tokenNumber}
+                    </p>
+                    <p className={`text-sm font-semibold ${statusConfig.textColor} mt-1`}>
                       {statusConfig.label}
                     </p>
                   </div>
                 </div>
                 <div className={`px-4 py-2 rounded-xl bg-gradient-to-r ${statusConfig.gradient} text-white font-bold text-sm`}>
-                  Booking ID: {booking.id}
+                  ID: {booking.id.slice(0, 8)}...
+                </div>
+              </div>
+
+              {/* Doctor Status Banner */}
+              <div className={`mb-6 p-4 rounded-xl ${doctorStatusConfig.bgColor} border-2 border-${doctorStatusConfig.textColor.replace('text-', '')}-300`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 ${doctorStatusConfig.bgColor} rounded-xl flex items-center justify-center border-2 border-${doctorStatusConfig.textColor.replace('text-', '')}-300`}>
+                      <DoctorStatusIcon size={24} className={doctorStatusConfig.textColor} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600 font-medium">Doctor Status</p>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 ${doctorStatusConfig.dotColor} rounded-full animate-pulse`} />
+                        <span className={`text-lg font-bold ${doctorStatusConfig.textColor}`}>
+                          {doctorStatusConfig.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-slate-600">Dr. {booking.doctor?.name}</p>
+                    <p className="text-xs text-slate-500">{booking.doctor?.specialty}</p>
+                  </div>
                 </div>
               </div>
 
@@ -441,6 +479,15 @@ export default function BookingStatusPage() {
               {booking.isToday && booking.queueStatus && ['confirmed', 'pending'].includes(booking.status) && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                    {/* Your Token */}
+                    <div className="bg-gradient-to-br from-sky-50 to-sky-100 backdrop-blur-sm rounded-xl p-4 text-center border-2 border-sky-300 shadow-lg">
+                      <div className="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mx-auto mb-2 shadow-md">
+                        <Hash size={20} className="text-white" />
+                      </div>
+                      <p className="text-3xl font-bold text-sky-700">{booking.tokenNumber}</p>
+                      <p className="text-xs text-sky-600 mt-1 font-semibold">Your Token</p>
+                    </div>
+
                     {/* Current Token Being Served */}
                     <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 text-center border border-white/50">
                       <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-2">
@@ -450,13 +497,13 @@ export default function BookingStatusPage() {
                       <p className="text-xs text-slate-600 mt-1">Current Token</p>
                     </div>
 
-                    {/* Position in Queue */}
+                    {/* Next Token */}
                     <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 text-center border border-white/50">
-                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                        <Users size={20} className="text-orange-600" />
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                        <TrendingUp size={20} className="text-green-600" />
                       </div>
-                      <p className="text-2xl font-bold text-slate-800">{booking.queueStatus.tokensAhead}</p>
-                      <p className="text-xs text-slate-600 mt-1">Ahead of You</p>
+                      <p className="text-2xl font-bold text-slate-800">{booking.queueStatus.currentToken + 1}</p>
+                      <p className="text-xs text-slate-600 mt-1">Next Token</p>
                     </div>
 
                     {/* Estimated Wait Time */}
@@ -466,15 +513,6 @@ export default function BookingStatusPage() {
                       </div>
                       <p className="text-2xl font-bold text-slate-800">{booking.queueStatus.estimatedWaitingMinutes}</p>
                       <p className="text-xs text-slate-600 mt-1">Mins Wait</p>
-                    </div>
-
-                    {/* Next Token */}
-                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 text-center border border-white/50">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                        <TrendingUp size={20} className="text-green-600" />
-                      </div>
-                      <p className="text-2xl font-bold text-slate-800">{booking.queueStatus.currentToken + 1}</p>
-                      <p className="text-xs text-slate-600 mt-1">Next Token</p>
                     </div>
                   </div>
 

@@ -111,11 +111,15 @@ export async function GET(request) {
     }));
 
     // Group bookings by status
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const groupedBookings = {
-      upcoming: bookings.filter(b => 
-        b.status === 'confirmed' && 
-        new Date(b.appointmentDate) > new Date()
-      ),
+      upcoming: bookings.filter(b => {
+        const appointmentDate = new Date(b.appointmentDate);
+        appointmentDate.setHours(0, 0, 0, 0);
+        return b.status === 'confirmed' && appointmentDate >= today;
+      }),
       completed: bookings.filter(b => b.status === 'completed'),
       cancelled: bookings.filter(b => b.status === 'cancelled'),
       pending: bookings.filter(b => b.status === 'pending'),

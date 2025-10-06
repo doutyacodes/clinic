@@ -18,6 +18,15 @@ export async function GET(request, { params }) {
     const booking = await db.query.appointments.findFirst({
       where: eq(appointments.id, bookingId),
       with: {
+        user: {
+          columns: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
         doctor: {
           with: {
             specialty: true,
@@ -118,10 +127,15 @@ export async function GET(request, { params }) {
       bookingType: booking.bookingType,
       consultationFee: booking.consultationFee,
       patientComplaints: booking.patientComplaints,
+      patientName: booking.user ? `${booking.user.firstName} ${booking.user.lastName}`.trim() : null,
       createdAt: booking.createdAt,
       sessionId: booking.sessionId,
       isToday,
       queueStatus,
+      user: booking.user ? {
+        firstName: booking.user.firstName,
+        lastName: booking.user.lastName,
+      } : null,
       doctor: booking.doctor ? {
         id: booking.doctor.id,
         name: booking.doctor.name,
@@ -130,6 +144,7 @@ export async function GET(request, { params }) {
         rating: booking.doctor.rating,
         qualification: booking.doctor.qualification,
         experience: booking.doctor.experience,
+        status: booking.doctor.status || 'offline', // Include doctor status
         // Hide personal contact information for public access
       } : null,
       hospital: booking.hospital ? {
