@@ -74,7 +74,7 @@ export default function Navbar() {
 
   const profileMenuItems = [
     { href: "/profile", label: "My Profile", icon: User },
-    { href: "/settings", label: "Settings", icon: Settings },
+    // { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (
