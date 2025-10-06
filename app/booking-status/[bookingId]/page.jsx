@@ -42,6 +42,79 @@ import {
 } from 'lucide-react';
 import ModifyAppointmentModal from '@/components/ModifyAppointmentModal';
 
+// Break Timer Component with Countdown
+function BreakTimerBox({ doctorName, breakEndTime, breakType }) {
+  const [timeRemaining, setTimeRemaining] = useState(null);
+
+  useEffect(() => {
+    if (breakType !== 'timed' || !breakEndTime) {
+      setTimeRemaining(null);
+      return;
+    }
+
+    const updateTimer = () => {
+      const now = new Date();
+      const end = new Date(breakEndTime);
+      const diff = Math.max(0, Math.floor((end - now) / 1000)); // seconds
+      setTimeRemaining(diff);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [breakEndTime, breakType]);
+
+  const formatTime = (seconds) => {
+    if (seconds === null) return null;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (breakType === 'indefinite') {
+    return (
+      <motion.div
+        className="p-3 bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl text-white"
+        initial={{ scale: 0.95 }}
+        animate={{ scale: 1 }}
+      >
+        <div className="flex items-center gap-2">
+          <Coffee size={18} />
+          <div className="flex-1">
+            <p className="text-sm font-bold">On Break - Indefinite</p>
+            <p className="text-xs opacity-90">Will resume shortly</p>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (breakType === 'timed' && timeRemaining !== null) {
+    return (
+      <motion.div
+        className="p-3 bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl text-white"
+        initial={{ scale: 0.95 }}
+        animate={{ scale: 1 }}
+      >
+        <div className="flex items-center gap-2">
+          <Coffee size={18} />
+          <div className="flex-1">
+            <p className="text-sm font-bold">On Break - Resuming in</p>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="bg-white/20 rounded px-2 py-0.5">
+                <p className="text-lg font-mono font-bold">{formatTime(timeRemaining)}</p>
+              </div>
+              <p className="text-xs opacity-90">min</p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return null;
+}
+
 export default function BookingStatusPage() {
   const [booking, setBooking] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -455,147 +528,185 @@ export default function BookingStatusPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main Content - Left Column */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            {/* Status Hero Card */}
+            {/* Compact Hero Card - Mobile First */}
             <motion.div
-              className={`card-futuristic ${statusConfig.bgColor} ${statusConfig.borderColor} border-2 p-6 sm:p-8`}
+              className={`card-futuristic ${statusConfig.bgColor} ${statusConfig.borderColor} border-2 p-4 sm:p-6`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-4">
-                  <div className={`w-16 h-16 ${statusConfig.bgColor} rounded-2xl flex items-center justify-center border-2 ${statusConfig.borderColor}`}>
-                    <StatusIcon size={32} className={statusConfig.textColor} />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-slate-800">
-                      {booking.patientName || `${booking.user?.firstName || 'Patient'} ${booking.user?.lastName || ''}`.trim()}
-                    </h2>
-                    <p className={`text-lg font-bold ${statusConfig.textColor}`}>
-                      Token #{booking.tokenNumber}
-                    </p>
-                    <p className={`text-sm font-semibold ${statusConfig.textColor} mt-1`}>
-                      {statusConfig.label}
-                    </p>
-                  </div>
-                </div>
-                <div className={`px-4 py-2 rounded-xl bg-gradient-to-r ${statusConfig.gradient} text-white font-bold text-sm`}>
-                  ID: {booking.id.slice(0, 8)}...
+              {/* Doctor Name - Most Prominent */}
+              <div className="mb-4">
+                <h1 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-1">
+                  Dr. {booking.doctor?.name}
+                </h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sky-600 font-semibold text-sm sm:text-base">{booking.doctor?.specialty}</p>
+                  <span className="text-slate-300">•</span>
+                  <p className="text-slate-600 text-sm">{booking.hospital?.name}</p>
                 </div>
               </div>
 
-              {/* Doctor Status Banner */}
-              <div className={`mb-6 p-4 rounded-xl ${doctorStatusConfig.bgColor} border-2 border-${doctorStatusConfig.textColor.replace('text-', '')}-300`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 ${doctorStatusConfig.bgColor} rounded-xl flex items-center justify-center border-2 border-${doctorStatusConfig.textColor.replace('text-', '')}-300`}>
-                      <DoctorStatusIcon size={24} className={doctorStatusConfig.textColor} />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-600 font-medium">Doctor Status</p>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 ${doctorStatusConfig.dotColor} rounded-full animate-pulse`} />
-                        <span className={`text-lg font-bold ${doctorStatusConfig.textColor}`}>
-                          {doctorStatusConfig.label}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-slate-600">Dr. {booking.doctor?.name}</p>
-                    <p className="text-xs text-slate-500">{booking.doctor?.specialty}</p>
-                  </div>
-                </div>
+              {/* Patient Info - Small */}
+              <div className="mb-4 pb-4 border-b border-slate-200">
+                <p className="text-xs text-slate-500">Patient</p>
+                <p className="text-sm font-medium text-slate-700">
+                  {booking.patientName || `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim()}
+                </p>
               </div>
 
               {/* Live Queue Status */}
               {booking.isToday && booking.queueStatus && ['confirmed', 'pending'].includes(booking.status) && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                <div className="space-y-3">
+                  {/* Token Grid - Compact */}
+                  <div className="grid grid-cols-4 gap-2">
                     {/* Your Token */}
-                    <div className="bg-gradient-to-br from-sky-50 to-sky-100 backdrop-blur-sm rounded-xl p-4 text-center border-2 border-sky-300 shadow-lg">
-                      <div className="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mx-auto mb-2 shadow-md">
-                        <Hash size={20} className="text-white" />
-                      </div>
-                      <p className="text-3xl font-bold text-sky-700">{booking.tokenNumber}</p>
-                      <p className="text-xs text-sky-600 mt-1 font-semibold">Your Token</p>
+                    <div className="bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl p-3 text-center shadow-lg col-span-1">
+                      <p className="text-2xl sm:text-3xl font-bold text-white">{booking.tokenNumber}</p>
+                      <p className="text-[10px] sm:text-xs text-sky-100 mt-1 font-semibold">Your Token</p>
                     </div>
 
-                    {/* Current Token Being Served */}
-                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 text-center border border-white/50">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                        <Activity size={20} className="text-blue-600" />
-                      </div>
-                      <p className="text-2xl font-bold text-slate-800">{booking.queueStatus.currentToken}</p>
-                      <p className="text-xs text-slate-600 mt-1">Current Token</p>
+                    {/* Current Token */}
+                    <div className="bg-white rounded-xl p-3 text-center border-2 border-blue-200 col-span-1">
+                      <p className="text-xl sm:text-2xl font-bold text-blue-600">{booking.queueStatus.currentToken}</p>
+                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Current</p>
                     </div>
 
                     {/* Next Token */}
-                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 text-center border border-white/50">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                        <TrendingUp size={20} className="text-green-600" />
-                      </div>
-                      <p className="text-2xl font-bold text-slate-800">{booking.queueStatus.currentToken + 1}</p>
-                      <p className="text-xs text-slate-600 mt-1">Next Token</p>
+                    <div className="bg-white rounded-xl p-3 text-center border-2 border-green-200 col-span-1">
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">{booking.queueStatus.currentToken + 1}</p>
+                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Next</p>
                     </div>
 
-                    {/* Estimated Wait Time */}
-                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 text-center border border-white/50">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                        <Timer size={20} className="text-purple-600" />
-                      </div>
-                      <p className="text-2xl font-bold text-slate-800">{booking.queueStatus.estimatedWaitingMinutes}</p>
-                      <p className="text-xs text-slate-600 mt-1">Mins Wait</p>
+                    {/* Wait Time */}
+                    <div className="bg-white rounded-xl p-3 text-center border-2 border-purple-200 col-span-1">
+                      <p className="text-xl sm:text-2xl font-bold text-purple-600">{booking.queueStatus.estimatedWaitingMinutes}</p>
+                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Mins</p>
                     </div>
                   </div>
 
-                  {/* Your Turn Alert */}
-                  {booking.queueStatus.queuePosition === 'current' && (
+                  {/* Dynamic Status Alert - Real-time Updates */}
+                  {booking.queueStatus.queuePosition === 'current' ? (
+                    // User's turn - status dependent
                     <>
-                      {['on_break', 'emergency', 'offline'].includes(booking.doctor?.status) ? (
+                      {booking.doctor?.status === 'on_break' && booking.doctor?.breakType === 'timed' && booking.doctor?.breakEndTime ? (
+                        <BreakTimerBox
+                          doctorName={booking.doctor.name}
+                          breakEndTime={booking.doctor.breakEndTime}
+                          breakType={booking.doctor.breakType}
+                        />
+                      ) : booking.doctor?.status === 'on_break' && booking.doctor?.breakType === 'indefinite' ? (
                         <motion.div
-                          className="p-4 bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl text-white text-center"
+                          className="p-3 bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl text-white"
                           initial={{ scale: 0.95 }}
                           animate={{ scale: 1 }}
-                          transition={{ type: 'spring', stiffness: 300 }}
                         >
-                          <p className="text-lg font-bold">⏸️ Please Wait!</p>
-                          <p className="text-sm mt-1">
-                            It's your turn, but Dr. {booking.doctor?.name} is currently {doctorStatusConfig.label.toLowerCase()}.
-                            You'll be called when available.
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <Coffee size={20} />
+                            <div className="flex-1">
+                              <p className="text-sm font-bold">⏸️ Doctor on Break</p>
+                              <p className="text-xs opacity-90">It's your turn, but please wait. You'll be called shortly.</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ) : booking.doctor?.status === 'emergency' ? (
+                        <motion.div
+                          className="p-3 bg-gradient-to-r from-red-500 to-rose-600 rounded-xl text-white"
+                          initial={{ scale: 0.95 }}
+                          animate={{ scale: 1 }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Siren size={20} className="animate-pulse" />
+                            <div className="flex-1">
+                              <p className="text-sm font-bold">🚨 Medical Emergency</p>
+                              <p className="text-xs opacity-90">It's your turn, but doctor is handling emergency. Please wait.</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ) : booking.doctor?.status === 'offline' ? (
+                        <motion.div
+                          className="p-3 bg-gradient-to-r from-slate-500 to-slate-600 rounded-xl text-white"
+                          initial={{ scale: 0.95 }}
+                          animate={{ scale: 1 }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <WifiOff size={20} />
+                            <div className="flex-1">
+                              <p className="text-sm font-bold">⏸️ Doctor Unavailable</p>
+                              <p className="text-xs opacity-90">It's your turn. Please wait for updates.</p>
+                            </div>
+                          </div>
                         </motion.div>
                       ) : (
                         <motion.div
-                          className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white text-center"
+                          className="p-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white"
                           initial={{ scale: 0.95 }}
                           animate={{ scale: 1 }}
-                          transition={{ type: 'spring', stiffness: 300 }}
                         >
-                          <p className="text-lg font-bold">🎉 It's Your Turn!</p>
-                          <p className="text-sm mt-1">Please proceed to the consultation room</p>
+                          <div className="flex items-center gap-2">
+                            <CheckCircle size={20} />
+                            <div className="flex-1">
+                              <p className="text-sm font-bold">🎉 It's Your Turn!</p>
+                              <p className="text-xs opacity-90">Please proceed to the consultation room</p>
+                            </div>
+                          </div>
                         </motion.div>
                       )}
                     </>
-                  )}
-
-                  {/* Delay Warning for users in queue when doctor is unavailable */}
-                  {booking.queueStatus.queuePosition !== 'current' &&
-                   booking.queueStatus.tokensAhead <= 3 &&
-                   ['on_break', 'emergency', 'offline'].includes(booking.doctor?.status) && (
-                    <motion.div
-                      className="p-4 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-xl text-white text-center border-2 border-yellow-400"
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
-                    >
-                      <p className="text-sm font-bold">⚠️ Possible Delay Notice</p>
-                      <p className="text-xs mt-1">
-                        Dr. {booking.doctor?.name} is currently {doctorStatusConfig.label.toLowerCase()}.
-                        There may be a delay in your consultation time.
-                      </p>
-                    </motion.div>
-                  )}
+                  ) : booking.queueStatus.tokensAhead <= 3 && ['on_break', 'emergency', 'offline'].includes(booking.doctor?.status) ? (
+                    // User is close but doctor unavailable
+                    <>
+                      {booking.doctor?.status === 'on_break' && booking.doctor?.breakType === 'timed' && booking.doctor?.breakEndTime ? (
+                        <BreakTimerBox
+                          doctorName={booking.doctor.name}
+                          breakEndTime={booking.doctor.breakEndTime}
+                          breakType={booking.doctor.breakType}
+                        />
+                      ) : booking.doctor?.status === 'on_break' ? (
+                        <motion.div
+                          className="p-3 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-xl text-white"
+                          initial={{ scale: 0.95 }}
+                          animate={{ scale: 1 }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Coffee size={18} />
+                            <div className="flex-1">
+                              <p className="text-sm font-bold">⚠️ Possible Delay</p>
+                              <p className="text-xs opacity-90">Doctor is on break. {booking.queueStatus.tokensAhead} ahead of you.</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ) : booking.doctor?.status === 'emergency' ? (
+                        <motion.div
+                          className="p-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl text-white"
+                          initial={{ scale: 0.95 }}
+                          animate={{ scale: 1 }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Siren size={18} className="animate-pulse" />
+                            <div className="flex-1">
+                              <p className="text-sm font-bold">⚠️ Medical Emergency</p>
+                              <p className="text-xs opacity-90">Expect delays. {booking.queueStatus.tokensAhead} ahead of you.</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          className="p-3 bg-gradient-to-r from-slate-400 to-slate-500 rounded-xl text-white"
+                          initial={{ scale: 0.95 }}
+                          animate={{ scale: 1 }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <WifiOff size={18} />
+                            <div className="flex-1">
+                              <p className="text-sm font-bold">⚠️ Doctor Unavailable</p>
+                              <p className="text-xs opacity-90">Possible delays. {booking.queueStatus.tokensAhead} ahead of you.</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </>
+                  ) : null}
 
                   {/* Progress Bar */}
                   <div>

@@ -145,6 +145,10 @@ export async function GET(request, { params }) {
         qualification: booking.doctor.qualification,
         experience: booking.doctor.experience,
         status: booking.doctor.status || 'offline', // Include doctor status
+        breakType: booking.doctor.breakType,
+        breakEndTime: booking.doctor.breakEndTime,
+        breakStartTime: booking.doctor.breakStartTime,
+        breakReason: booking.doctor.breakReason,
         // Hide personal contact information for public access
       } : null,
       hospital: booking.hospital ? {
