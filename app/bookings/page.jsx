@@ -393,6 +393,9 @@ export default function BookingsPage() {
                             <div className="min-w-0">
                               <p className="text-xs text-slate-500">Hospital</p>
                               <p className="font-semibold text-slate-800 truncate">{booking.hospital?.name}</p>
+                              {booking.hospital?.address && (
+                                <p className="text-xs text-slate-600 truncate">{booking.hospital.address}</p>
+                              )}
                             </div>
                           </div>
 
@@ -402,6 +405,9 @@ export default function BookingsPage() {
                             <div>
                               <p className="text-xs text-slate-500">Token Number</p>
                               <p className="font-bold text-lg text-purple-700">#{booking.tokenNumber}</p>
+                              {booking.bookingType && (
+                                <p className="text-xs text-purple-600 capitalize">{booking.bookingType}</p>
+                              )}
                             </div>
                           </div>
 
@@ -413,6 +419,11 @@ export default function BookingsPage() {
                               <p className="font-semibold text-slate-800 text-sm truncate">
                                 {formatDate(booking.appointmentDate)}
                               </p>
+                              {booking.session && (
+                                <p className="text-xs text-blue-600">
+                                  {booking.session.startTime} - {booking.session.endTime}
+                                </p>
+                              )}
                             </div>
                           </div>
 
@@ -422,6 +433,11 @@ export default function BookingsPage() {
                             <div>
                               <p className="text-xs text-slate-500">Estimated Time</p>
                               <p className="font-semibold text-slate-800">{formatTime(booking.estimatedTime)}</p>
+                              {booking.actualStartTime && booking.actualEndTime && (
+                                <p className="text-xs text-green-600">
+                                  Actual: {formatTime(booking.actualStartTime)} - {formatTime(booking.actualEndTime)}
+                                </p>
+                              )}
                             </div>
                           </div>
 
@@ -439,6 +455,11 @@ export default function BookingsPage() {
                                 }`}>
                                   {booking.payment.status === 'completed' ? '✓ Paid' : 'Pending'}
                                 </p>
+                                {booking.payment.transactionId && (
+                                  <p className="text-xs text-slate-500 truncate">
+                                    Txn: {booking.payment.transactionId}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           )}
@@ -455,6 +476,39 @@ export default function BookingsPage() {
                           )}
                         </div>
 
+                        {/* Contact Information */}
+                        {(booking.hospital?.phone || booking.doctor?.phone || booking.doctor?.email) && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                            {booking.hospital?.phone && (
+                              <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl">
+                                <Phone size={18} className="text-indigo-600 flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs text-slate-500">Hospital Contact</p>
+                                  <p className="font-semibold text-slate-800 truncate">{booking.hospital.phone}</p>
+                                </div>
+                              </div>
+                            )}
+                            {booking.doctor?.phone && (
+                              <div className="flex items-center gap-3 p-3 bg-teal-50 rounded-xl">
+                                <Phone size={18} className="text-teal-600 flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs text-slate-500">Doctor Contact</p>
+                                  <p className="font-semibold text-slate-800 truncate">{booking.doctor.phone}</p>
+                                </div>
+                              </div>
+                            )}
+                            {booking.doctor?.email && (
+                              <div className="flex items-center gap-3 p-3 bg-rose-50 rounded-xl">
+                                <User size={18} className="text-rose-600 flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs text-slate-500">Doctor Email</p>
+                                  <p className="font-semibold text-slate-800 text-sm truncate">{booking.doctor.email}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Additional Info */}
                         {booking.patientComplaints && (
                           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
@@ -465,6 +519,86 @@ export default function BookingsPage() {
                                 <p className="text-sm text-blue-600">{booking.patientComplaints}</p>
                               </div>
                             </div>
+                          </div>
+                        )}
+
+                        {/* Doctor Notes */}
+                        {booking.doctorNotes && (
+                          <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
+                            <div className="flex items-start gap-2">
+                              <FileText size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-purple-700 mb-1">Doctor's Notes</p>
+                                <p className="text-sm text-purple-600">{booking.doctorNotes}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Prescription */}
+                        {booking.prescription && (
+                          <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                            <div className="flex items-start gap-2">
+                              <Heart size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-green-700 mb-1">Prescription</p>
+                                <p className="text-sm text-green-600 whitespace-pre-wrap">{booking.prescription}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Medical Record */}
+                        {booking.medicalRecord && (
+                          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Activity size={18} className="text-emerald-600" />
+                              <p className="text-sm font-bold text-emerald-800">Medical Record</p>
+                            </div>
+                            <div className="space-y-3">
+                              {booking.medicalRecord.diagnosis && (
+                                <div>
+                                  <p className="text-xs font-semibold text-emerald-700 mb-1">Diagnosis</p>
+                                  <p className="text-sm text-emerald-600">{booking.medicalRecord.diagnosis}</p>
+                                </div>
+                              )}
+                              {booking.medicalRecord.symptoms && (
+                                <div>
+                                  <p className="text-xs font-semibold text-emerald-700 mb-1">Symptoms</p>
+                                  <p className="text-sm text-emerald-600">{booking.medicalRecord.symptoms}</p>
+                                </div>
+                              )}
+                              {booking.medicalRecord.treatment && (
+                                <div>
+                                  <p className="text-xs font-semibold text-emerald-700 mb-1">Treatment</p>
+                                  <p className="text-sm text-emerald-600 whitespace-pre-wrap">{booking.medicalRecord.treatment}</p>
+                                </div>
+                              )}
+                              {booking.medicalRecord.prescription && (
+                                <div>
+                                  <p className="text-xs font-semibold text-emerald-700 mb-1">Prescribed Medication</p>
+                                  <p className="text-sm text-emerald-600 whitespace-pre-wrap">{booking.medicalRecord.prescription}</p>
+                                </div>
+                              )}
+                              {booking.medicalRecord.followUpDate && (
+                                <div className="flex items-center gap-2 pt-2 border-t border-emerald-200">
+                                  <Calendar size={14} className="text-emerald-600" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-emerald-700">Follow-up Date</p>
+                                    <p className="text-sm text-emerald-600">{formatDate(booking.medicalRecord.followUpDate)}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Booking Metadata */}
+                        {booking.createdAt && (
+                          <div className="pt-3 border-t border-slate-200">
+                            <p className="text-xs text-slate-500">
+                              Booked on {formatDate(booking.createdAt)}
+                            </p>
                           </div>
                         )}
                       </div>
