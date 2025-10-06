@@ -111,28 +111,61 @@ export default function BookingStatusPage() {
     const doctorStatus = booking.doctor?.status || 'offline';
     const doctorStatusConfig = getDoctorStatusConfig(doctorStatus);
 
+    // Check if doctor is unavailable (on break or emergency)
+    const isDoctorUnavailable = ['on_break', 'emergency', 'offline'].includes(doctorStatus);
+
     if (previousTokensAhead > currentTokensAhead) {
       if (currentTokensAhead === 0) {
-        new Notification(`🎉 ${patientName} - Your Turn!`, {
-          body: `Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. Please proceed to consultation room.`,
-          icon: '/icon-192x192.png',
-          badge: '/icon-192x192.png',
-          tag: 'queue-update'
-        });
+        // It's the user's turn
+        if (isDoctorUnavailable) {
+          new Notification(`⏸️ ${patientName} - Please Wait`, {
+            body: `Dr. ${booking.doctor?.name} is currently ${doctorStatusConfig.label}. Please wait, you'll be called when doctor is available.`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: 'queue-update'
+          });
+        } else {
+          new Notification(`🎉 ${patientName} - Your Turn!`, {
+            body: `Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. Please proceed to consultation room.`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: 'queue-update'
+          });
+        }
       } else if (currentTokensAhead === 1) {
-        new Notification(`⚡ ${patientName} - You're Next!`, {
-          body: `Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. Token #${booking.tokenNumber}`,
-          icon: '/icon-192x192.png',
-          badge: '/icon-192x192.png',
-          tag: 'queue-update'
-        });
+        // User is next
+        if (isDoctorUnavailable) {
+          new Notification(`⚠️ ${patientName} - Possible Delay`, {
+            body: `You're next, but Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. There may be a delay.`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: 'queue-update'
+          });
+        } else {
+          new Notification(`⚡ ${patientName} - You're Next!`, {
+            body: `Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. Token #${booking.tokenNumber}`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: 'queue-update'
+          });
+        }
       } else if (currentTokensAhead <= 3) {
-        new Notification(`🔔 ${patientName} - Almost Your Turn`, {
-          body: `Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. Current: #${booking.queueStatus.currentToken}, Your Token: #${booking.tokenNumber}`,
-          icon: '/icon-192x192.png',
-          badge: '/icon-192x192.png',
-          tag: 'queue-update'
-        });
+        // User is in top 3
+        if (isDoctorUnavailable) {
+          new Notification(`📋 ${patientName} - Queue Update`, {
+            body: `${currentTokensAhead} patients ahead. Note: Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}, there may be delays.`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: 'queue-update'
+          });
+        } else {
+          new Notification(`🔔 ${patientName} - Almost Your Turn`, {
+            body: `Dr. ${booking.doctor?.name} is ${doctorStatusConfig.label}. Current: #${booking.queueStatus.currentToken}, Your Token: #${booking.tokenNumber}`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: 'queue-update'
+          });
+        }
       }
     }
 
@@ -518,14 +551,49 @@ export default function BookingStatusPage() {
 
                   {/* Your Turn Alert */}
                   {booking.queueStatus.queuePosition === 'current' && (
+                    <>
+                      {['on_break', 'emergency', 'offline'].includes(booking.doctor?.status) ? (
+                        <motion.div
+                          className="p-4 bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl text-white text-center"
+                          initial={{ scale: 0.95 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: 'spring', stiffness: 300 }}
+                        >
+                          <p className="text-lg font-bold">⏸️ Please Wait!</p>
+                          <p className="text-sm mt-1">
+                            It's your turn, but Dr. {booking.doctor?.name} is currently {doctorStatusConfig.label.toLowerCase()}.
+                            You'll be called when available.
+                          </p>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white text-center"
+                          initial={{ scale: 0.95 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: 'spring', stiffness: 300 }}
+                        >
+                          <p className="text-lg font-bold">🎉 It's Your Turn!</p>
+                          <p className="text-sm mt-1">Please proceed to the consultation room</p>
+                        </motion.div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Delay Warning for users in queue when doctor is unavailable */}
+                  {booking.queueStatus.queuePosition !== 'current' &&
+                   booking.queueStatus.tokensAhead <= 3 &&
+                   ['on_break', 'emergency', 'offline'].includes(booking.doctor?.status) && (
                     <motion.div
-                      className="p-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white text-center"
-                      initial={{ scale: 0.95 }}
-                      animate={{ scale: 1 }}
+                      className="p-4 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-xl text-white text-center border-2 border-yellow-400"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
                       transition={{ type: 'spring', stiffness: 300 }}
                     >
-                      <p className="text-lg font-bold">🎉 It's Your Turn!</p>
-                      <p className="text-sm mt-1">Please proceed to the consultation room</p>
+                      <p className="text-sm font-bold">⚠️ Possible Delay Notice</p>
+                      <p className="text-xs mt-1">
+                        Dr. {booking.doctor?.name} is currently {doctorStatusConfig.label.toLowerCase()}.
+                        There may be a delay in your consultation time.
+                      </p>
                     </motion.div>
                   )}
 
