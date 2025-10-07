@@ -604,15 +604,15 @@ export default function BookingsPage() {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex lg:flex-col gap-2 lg:w-48">
+                      <div className="flex lg:flex-col gap-2 lg:w-40">
                         <motion.button
                           onClick={() => router.push(`/booking-status/${booking.id}`)}
-                          className="flex-1 lg:w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                          className="flex-1 lg:w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white px-3 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm touch-manipulation min-h-[44px]"
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                         >
-                          <Eye size={16} />
-                          View Details
+                          <Eye size={18} className="flex-shrink-0" />
+                          <span>View Details</span>
                         </motion.button>
 
                         {booking.payment?.status === 'completed' && (
@@ -638,12 +638,12 @@ export default function BookingsPage() {
                                 alert('Failed to download receipt');
                               }
                             }}
-                            className="flex-1 lg:w-full border-2 border-purple-300 text-purple-600 px-4 py-2.5 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-200 flex items-center justify-center gap-2"
+                            className="flex-1 lg:w-full border-2 border-purple-300 text-purple-600 px-3 py-3 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-200 flex items-center justify-center gap-2 text-sm touch-manipulation min-h-[44px]"
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                           >
-                            <Download size={16} />
-                            Receipt
+                            <Download size={18} className="flex-shrink-0" />
+                            <span>Receipt</span>
                           </motion.button>
                         )}
                       </div>

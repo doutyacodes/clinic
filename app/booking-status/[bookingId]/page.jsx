@@ -547,6 +547,117 @@ export default function BookingStatusPage() {
                 </div>
               </div>
 
+              {/* Session Timing & Status - Enhanced */}
+              <div className="mb-4 pb-4 border-b border-slate-200 space-y-3">
+                {/* Appointment Date & Time */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/70 rounded-xl p-3 border border-slate-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calendar size={14} className="text-blue-600" />
+                      <p className="text-xs text-slate-500 font-medium">Date</p>
+                    </div>
+                    <p className="text-sm font-bold text-slate-800">
+                      {new Date(booking.appointmentDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                  <div className="bg-white/70 rounded-xl p-3 border border-slate-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock size={14} className="text-purple-600" />
+                      <p className="text-xs text-slate-500 font-medium">Your Time</p>
+                    </div>
+                    <p className="text-sm font-bold text-slate-800">{booking.estimatedTime}</p>
+                  </div>
+                </div>
+
+                {/* Session Timing */}
+                {booking.session && (
+                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-3 border border-orange-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Timer size={16} className="text-orange-600" />
+                        <p className="text-xs text-orange-700 font-semibold">Session Timing</p>
+                      </div>
+                      <p className="text-sm font-bold text-slate-800">
+                        {booking.session.startTime} - {booking.session.endTime}
+                      </p>
+                    </div>
+
+                    {/* Session Status & Countdown */}
+                    {(() => {
+                      const now = new Date();
+                      const appointmentDate = new Date(booking.appointmentDate);
+                      const [startHours, startMinutes] = booking.session.startTime.split(':').map(Number);
+                      const [endHours, endMinutes] = booking.session.endTime.split(':').map(Number);
+
+                      const sessionStart = new Date(appointmentDate);
+                      sessionStart.setHours(startHours, startMinutes, 0, 0);
+
+                      const sessionEnd = new Date(appointmentDate);
+                      sessionEnd.setHours(endHours, endMinutes, 0, 0);
+
+                      const isSameDay = now.toDateString() === appointmentDate.toDateString();
+                      const hasStarted = now >= sessionStart;
+                      const hasEnded = now >= sessionEnd;
+
+                      if (!isSameDay) {
+                        // Future date
+                        const daysUntil = Math.ceil((appointmentDate - now) / (1000 * 60 * 60 * 24));
+                        return (
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span className="text-slate-600 font-medium">
+                              Session starts in {daysUntil} {daysUntil === 1 ? 'day' : 'days'}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (hasEnded) {
+                        return (
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                            <span className="text-slate-600 font-medium">Session has ended</span>
+                          </div>
+                        );
+                      }
+
+                      if (hasStarted) {
+                        return (
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-green-700 font-semibold">✓ Session is active</span>
+                          </div>
+                        );
+                      }
+
+                      // Calculate time remaining
+                      const timeRemaining = Math.max(0, Math.floor((sessionStart - now) / 1000)); // in seconds
+                      const hoursRemaining = Math.floor(timeRemaining / 3600);
+                      const minutesRemaining = Math.floor((timeRemaining % 3600) / 60);
+
+                      return (
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                            <span className="text-amber-700 font-semibold">Starting soon</span>
+                          </div>
+                          <div className="flex items-center gap-1 bg-white/80 rounded-lg px-2 py-1">
+                            <Clock size={12} className="text-amber-600" />
+                            <span className="font-mono font-bold text-amber-700">
+                              {hoursRemaining > 0 ? `${hoursRemaining}h ` : ''}{minutesRemaining}m
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
               {/* Patient Info - Small */}
               <div className="mb-4 pb-4 border-b border-slate-200">
                 <p className="text-xs text-slate-500">Patient</p>
