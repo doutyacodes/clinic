@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db/index.js';
-import { appointments } from '@/lib/db/schema.js';
-import { eq, and, gte } from 'drizzle-orm';
+import { appointments, tokenCallHistory, queuePositions } from '@/lib/db/schema.js';
+import { eq, and, gte, desc, sql } from 'drizzle-orm';
 
 export async function GET(request, { params }) {
   try {
@@ -54,16 +54,20 @@ export async function GET(request, { params }) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     appointmentDate.setHours(0, 0, 0, 0);
-    
+
     const isToday = appointmentDate.getTime() === today.getTime();
-    
+
     if (isToday && booking.status === 'confirmed') {
       // Get all appointments for this session today to calculate current position
       const todaysAppointments = await db.select({
+        id: appointments.id,
         tokenNumber: appointments.tokenNumber,
         status: appointments.status,
         actualStartTime: appointments.actualStartTime,
         actualEndTime: appointments.actualEndTime,
+        isRecalled: appointments.isRecalled,
+        recallCount: appointments.recallCount,
+        missedAppointment: appointments.missedAppointment,
       }).from(appointments)
         .where(and(
           eq(appointments.sessionId, booking.sessionId),
@@ -73,35 +77,102 @@ export async function GET(request, { params }) {
 
       // Filter active appointments (not cancelled)
       const activeAppointments = todaysAppointments.filter(apt => apt.status !== 'cancelled');
-      
+
       // Calculate current token being served
-      const completedAppointments = activeAppointments.filter(apt => 
+      const completedAppointments = activeAppointments.filter(apt =>
         apt.status === 'completed' || apt.actualEndTime
       );
-      
-      const currentlyServing = activeAppointments.find(apt => 
+
+      const currentlyServing = activeAppointments.find(apt =>
         apt.actualStartTime && !apt.actualEndTime && apt.status !== 'completed'
       );
 
-      // Calculate queue position
-      const currentToken = currentlyServing?.tokenNumber || 
-                          (completedAppointments.length > 0 ? 
-                           Math.max(...completedAppointments.map(apt => apt.tokenNumber)) + 1 : 1);
-      
+      // Calculate current token (use session's currentToken if available, fallback to calculation)
+      let currentToken = booking.session?.currentTokenNumber || 0;
+
+      if (!currentToken) {
+        currentToken = currentlyServing?.tokenNumber ||
+                      (completedAppointments.length > 0 ?
+                       Math.max(...completedAppointments.map(apt => apt.tokenNumber)) + 1 : 1);
+      }
+
+      // Check if current token is a recall by querying tokenCallHistory
+      let isCurrentTokenRecalled = false;
+      let currentTokenCallInfo = null;
+
+      try {
+        const callHistory = await db.query.tokenCallHistory.findFirst({
+          where: and(
+            eq(tokenCallHistory.sessionId, booking.sessionId),
+            eq(tokenCallHistory.appointmentDate, booking.appointmentDate),
+            eq(tokenCallHistory.tokenNumber, currentToken),
+            eq(tokenCallHistory.isRecall, true)
+          ),
+          orderBy: [desc(tokenCallHistory.calledAt)],
+        });
+
+        if (callHistory) {
+          isCurrentTokenRecalled = true;
+          currentTokenCallInfo = callHistory;
+        }
+      } catch (historyError) {
+        console.warn('Token call history query failed:', historyError.message);
+        // Fallback: check if current token appointment is recalled
+        const currentAppointment = activeAppointments.find(apt => apt.tokenNumber === currentToken);
+        if (currentAppointment?.isRecalled) {
+          isCurrentTokenRecalled = true;
+        }
+      }
+
+      // Count total tokens called (including recalls)
+      let totalTokensCalled = completedAppointments.length;
+      try {
+        const callHistoryCount = await db.select({
+          count: sql`COUNT(*)`,
+        }).from(tokenCallHistory)
+          .where(and(
+            eq(tokenCallHistory.sessionId, booking.sessionId),
+            eq(tokenCallHistory.appointmentDate, booking.appointmentDate)
+          ));
+
+        if (callHistoryCount && callHistoryCount[0]) {
+          totalTokensCalled = Number(callHistoryCount[0].count);
+        }
+      } catch (historyError) {
+        console.warn('Token call count query failed:', historyError.message);
+      }
+
+      // Get average wait time from queuePositions table
+      let averageWaitTimeMinutes = booking.session?.avgMinutesPerPatient || 15;
+      try {
+        const queuePosition = await db.query.queuePositions.findFirst({
+          where: and(
+            eq(queuePositions.sessionId, booking.sessionId),
+            eq(queuePositions.appointmentDate, booking.appointmentDate)
+          ),
+        });
+
+        if (queuePosition?.averageWaitTimeMinutes) {
+          averageWaitTimeMinutes = queuePosition.averageWaitTimeMinutes;
+        }
+      } catch (queueError) {
+        console.warn('Queue positions query failed:', queueError.message);
+      }
+
       const tokensAhead = Math.max(0, booking.tokenNumber - currentToken);
-      
+
       // Estimate waiting time based on average consultation time
-      const avgConsultationTime = booking.session?.avgMinutesPerPatient || 15;
-      const estimatedWaitingMinutes = tokensAhead * avgConsultationTime;
-      
+      const estimatedWaitingMinutes = tokensAhead * averageWaitTimeMinutes;
+
       // Calculate updated estimated time
       const now = new Date();
       const updatedEstimatedTime = new Date(now.getTime() + estimatedWaitingMinutes * 60000);
-      
+
       queueStatus = {
         currentToken,
         tokensAhead,
         estimatedWaitingMinutes,
+        averageWaitTimeMinutes,
         updatedEstimatedTime: updatedEstimatedTime.toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
@@ -109,8 +180,14 @@ export async function GET(request, { params }) {
         }),
         totalTokensToday: activeAppointments.length,
         completedToday: completedAppointments.length,
+        totalTokensCalled,
         currentlyServing: currentlyServing?.tokenNumber || null,
         queuePosition: booking.tokenNumber <= currentToken ? 'current' : 'waiting',
+        isCurrentTokenRecalled,
+        currentTokenRecallInfo: currentTokenCallInfo ? {
+          recallReason: currentTokenCallInfo.recallReason,
+          calledAt: currentTokenCallInfo.calledAt,
+        } : null,
         lastUpdated: new Date().toISOString(),
       };
     }
@@ -132,6 +209,13 @@ export async function GET(request, { params }) {
       sessionId: booking.sessionId,
       isToday,
       queueStatus,
+      // Add token recall data
+      isRecalled: booking.isRecalled || false,
+      recallCount: booking.recallCount || 0,
+      lastRecalledAt: booking.lastRecalledAt,
+      tokenStatus: booking.tokenStatus,
+      tokenLockExpiresAt: booking.tokenLockExpiresAt,
+      missedAppointment: booking.missedAppointment || false,
       user: booking.user ? {
         firstName: booking.user.firstName,
         lastName: booking.user.lastName,
@@ -167,6 +251,13 @@ export async function GET(request, { params }) {
         endTime: booking.session.endTime,
         maxTokens: booking.session.maxTokens,
         avgMinutesPerPatient: booking.session.avgMinutesPerPatient,
+        // Add room location details
+        roomNumber: booking.session.roomNumber,
+        floor: booking.session.floor,
+        buildingLocation: booking.session.buildingLocation,
+        // Add recall settings
+        recallCheckInterval: booking.session.recallCheckInterval || 5,
+        recallEnabled: booking.session.recallEnabled !== false,
       } : null,
       payment: booking.payments?.[0] ? {
         id: booking.payments[0].id,
