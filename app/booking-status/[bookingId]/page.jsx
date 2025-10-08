@@ -573,73 +573,117 @@ export default function BookingStatusPage() {
                   </div>
                 </div>
 
-                {/* Session Timing */}
-                {booking.session && (
-                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-3 border border-orange-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Timer size={16} className="text-orange-600" />
-                        <p className="text-xs text-orange-700 font-semibold">Session Timing</p>
+                {/* Session Timing with Doctor Status */}
+                {booking.session && (() => {
+                  const now = new Date();
+                  const appointmentDate = new Date(booking.appointmentDate);
+                  const [startHours, startMinutes] = booking.session.startTime.split(':').map(Number);
+                  const [endHours, endMinutes] = booking.session.endTime.split(':').map(Number);
+
+                  const sessionStart = new Date(appointmentDate);
+                  sessionStart.setHours(startHours, startMinutes, 0, 0);
+
+                  const sessionEnd = new Date(appointmentDate);
+                  sessionEnd.setHours(endHours, endMinutes, 0, 0);
+
+                  const isSameDay = now.toDateString() === appointmentDate.toDateString();
+                  const hasStarted = now >= sessionStart;
+                  const hasEnded = now >= sessionEnd;
+
+                  // Determine doctor status and styling
+                  const doctorStatus = booking.doctor?.status || 'offline';
+                  const isSessionActive = isSameDay && hasStarted && !hasEnded;
+
+                  // Dynamic background colors based on doctor status (only when session is active)
+                  let boxBgClass = 'bg-gradient-to-r from-orange-50 to-amber-50';
+                  let boxBorderClass = 'border-orange-200';
+                  let iconColorClass = 'text-orange-600';
+                  let textColorClass = 'text-orange-700';
+
+                  if (isSessionActive) {
+                    if (doctorStatus === 'emergency') {
+                      boxBgClass = 'bg-gradient-to-r from-red-100 to-rose-100';
+                      boxBorderClass = 'border-red-300';
+                      iconColorClass = 'text-red-600';
+                      textColorClass = 'text-red-700';
+                    } else if (doctorStatus === 'on_break') {
+                      boxBgClass = 'bg-gradient-to-r from-yellow-100 to-amber-100';
+                      boxBorderClass = 'border-yellow-300';
+                      iconColorClass = 'text-yellow-600';
+                      textColorClass = 'text-yellow-700';
+                    } else if (doctorStatus === 'offline') {
+                      boxBgClass = 'bg-gradient-to-r from-gray-100 to-slate-100';
+                      boxBorderClass = 'border-gray-300';
+                      iconColorClass = 'text-gray-600';
+                      textColorClass = 'text-gray-700';
+                    } else if (doctorStatus === 'consulting' || doctorStatus === 'online') {
+                      boxBgClass = 'bg-gradient-to-r from-green-50 to-emerald-50';
+                      boxBorderClass = 'border-green-200';
+                      iconColorClass = 'text-green-600';
+                      textColorClass = 'text-green-700';
+                    }
+                  }
+
+                  return (
+                    <div className={`${boxBgClass} rounded-xl p-3 border ${boxBorderClass}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Timer size={16} className={iconColorClass} />
+                          <p className={`text-xs ${textColorClass} font-semibold`}>Session Timing</p>
+                        </div>
+                        <p className="text-sm font-bold text-slate-800">
+                          {booking.session.startTime} - {booking.session.endTime}
+                        </p>
                       </div>
-                      <p className="text-sm font-bold text-slate-800">
-                        {booking.session.startTime} - {booking.session.endTime}
-                      </p>
-                    </div>
 
-                    {/* Session Status & Countdown */}
-                    {(() => {
-                      const now = new Date();
-                      const appointmentDate = new Date(booking.appointmentDate);
-                      const [startHours, startMinutes] = booking.session.startTime.split(':').map(Number);
-                      const [endHours, endMinutes] = booking.session.endTime.split(':').map(Number);
-
-                      const sessionStart = new Date(appointmentDate);
-                      sessionStart.setHours(startHours, startMinutes, 0, 0);
-
-                      const sessionEnd = new Date(appointmentDate);
-                      sessionEnd.setHours(endHours, endMinutes, 0, 0);
-
-                      const isSameDay = now.toDateString() === appointmentDate.toDateString();
-                      const hasStarted = now >= sessionStart;
-                      const hasEnded = now >= sessionEnd;
-
-                      if (!isSameDay) {
+                      {/* Session Status & Doctor Status Combined */}
+                      {!isSameDay ? (
                         // Future date
-                        const daysUntil = Math.ceil((appointmentDate - now) / (1000 * 60 * 60 * 24));
-                        return (
-                          <div className="flex items-center gap-2 text-xs">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            <span className="text-slate-600 font-medium">
-                              Session starts in {daysUntil} {daysUntil === 1 ? 'day' : 'days'}
-                            </span>
-                          </div>
-                        );
-                      }
-
-                      if (hasEnded) {
-                        return (
-                          <div className="flex items-center gap-2 text-xs">
-                            <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-                            <span className="text-slate-600 font-medium">Session has ended</span>
-                          </div>
-                        );
-                      }
-
-                      if (hasStarted) {
-                        return (
-                          <div className="flex items-center gap-2 text-xs">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                            <span className="text-green-700 font-semibold">✓ Session is active</span>
-                          </div>
-                        );
-                      }
-
-                      // Calculate time remaining
-                      const timeRemaining = Math.max(0, Math.floor((sessionStart - now) / 1000)); // in seconds
-                      const hoursRemaining = Math.floor(timeRemaining / 3600);
-                      const minutesRemaining = Math.floor((timeRemaining % 3600) / 60);
-
-                      return (
+                        <div className="flex items-center gap-2 text-xs">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-slate-600 font-medium">
+                            Session starts in {Math.ceil((appointmentDate - now) / (1000 * 60 * 60 * 24))} {Math.ceil((appointmentDate - now) / (1000 * 60 * 60 * 24)) === 1 ? 'day' : 'days'}
+                          </span>
+                        </div>
+                      ) : hasEnded ? (
+                        // Session ended
+                        <div className="flex items-center gap-2 text-xs">
+                          <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                          <span className="text-slate-600 font-medium">Session has ended</span>
+                        </div>
+                      ) : hasStarted ? (
+                        // Session is active - show doctor status
+                        <div className="space-y-2">
+                          {doctorStatus === 'emergency' ? (
+                            <div className="flex items-center gap-2 text-xs">
+                              <Siren size={14} className="text-red-600 animate-pulse" />
+                              <span className="text-red-700 font-bold">🚨 Medical Emergency - Delays Expected</span>
+                            </div>
+                          ) : doctorStatus === 'on_break' && booking.doctor?.breakType === 'timed' && booking.doctor?.breakEndTime ? (
+                            <BreakTimerBox
+                              doctorName={booking.doctor.name}
+                              breakEndTime={booking.doctor.breakEndTime}
+                              breakType={booking.doctor.breakType}
+                            />
+                          ) : doctorStatus === 'on_break' ? (
+                            <div className="flex items-center gap-2 text-xs">
+                              <Coffee size={14} className="text-yellow-600" />
+                              <span className="text-yellow-700 font-bold">☕ Doctor on Break - Will resume shortly</span>
+                            </div>
+                          ) : doctorStatus === 'offline' ? (
+                            <div className="flex items-center gap-2 text-xs">
+                              <WifiOff size={14} className="text-gray-600" />
+                              <span className="text-gray-700 font-bold">📵 Doctor Unavailable</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-xs">
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              <span className="text-green-700 font-semibold">✓ Session is active - Doctor Available</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        // Session starting soon
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
@@ -648,14 +692,19 @@ export default function BookingStatusPage() {
                           <div className="flex items-center gap-1 bg-white/80 rounded-lg px-2 py-1">
                             <Clock size={12} className="text-amber-600" />
                             <span className="font-mono font-bold text-amber-700">
-                              {hoursRemaining > 0 ? `${hoursRemaining}h ` : ''}{minutesRemaining}m
+                              {(() => {
+                                const timeRemaining = Math.max(0, Math.floor((sessionStart - now) / 1000));
+                                const hoursRemaining = Math.floor(timeRemaining / 3600);
+                                const minutesRemaining = Math.floor((timeRemaining % 3600) / 60);
+                                return `${hoursRemaining > 0 ? `${hoursRemaining}h ` : ''}${minutesRemaining}m`;
+                              })()}
                             </span>
                           </div>
                         </div>
-                      );
-                    })()}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Patient Info - Small */}
