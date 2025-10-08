@@ -34,6 +34,7 @@ import {
   Eye
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import Link from "next/link";
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState({
@@ -605,6 +606,7 @@ export default function BookingsPage() {
 
                       {/* Actions */}
                       <div className="flex lg:flex-col gap-2 lg:w-40">
+                        <Link href={`/booking-status/${booking.id}`}>
                         <motion.button
                           onClick={() => router.push(`/booking-status/${booking.id}`)}
                           className="flex-1 lg:w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white px-3 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm touch-manipulation min-h-[44px]"
@@ -614,6 +616,7 @@ export default function BookingsPage() {
                           <Eye size={18} className="flex-shrink-0" />
                           <span>View Details</span>
                         </motion.button>
+                        </Link>
 
                         {booking.payment?.status === 'completed' && (
                           <motion.button
