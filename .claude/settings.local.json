@@ -14,7 +14,10 @@
       "Bash(npm install:*)",
       "Bash(npm run lint)",
       "Read(//d/**)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(awk:*)",
+      "Bash(grep:*)",
+      "Bash(cut:*)"
     ],
     "deny": [],
     "ask": [],

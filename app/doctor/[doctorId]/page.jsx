@@ -25,12 +25,22 @@ import AppointmentBookingModal from "../../../components/AppointmentBookingModal
 import { useAuth } from "../../../contexts/AuthContext";
 import Image from "next/image";
 
+// Helper function to convert 24hr to 12hr format
+const convertTo12Hour = (time24) => {
+  if (!time24) return '';
+  const [hours, minutes] = time24.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+};
+
 export default function DoctorDetailPage() {
   const params = useParams();
   const router = useRouter();
   const doctorId = params.doctorId;
   const { isAuthenticated } = useAuth();
-  
+
   const [doctor, setDoctor] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -345,7 +355,7 @@ export default function DoctorDetailPage() {
                                 <div className="flex items-center gap-2">
                                   <Clock size={16} className="text-sky-500" />
                                   <span className="font-semibold text-slate-800">
-                                    {session.startTime} - {session.endTime}
+                                    {convertTo12Hour(session.startTime)} - {convertTo12Hour(session.endTime)}
                                   </span>
                                 </div>
                                 <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-semibold">

@@ -672,21 +672,49 @@ export default function BookingStatusPage() {
                   {/* Token Grid - Compact */}
                   <div className="grid grid-cols-4 gap-2">
                     {/* Your Token */}
-                    <div className="bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl p-3 text-center shadow-lg col-span-1">
+                    <div className={`rounded-xl p-3 text-center shadow-lg col-span-1 ${
+                      booking.isRecalled
+                        ? 'bg-gradient-to-br from-amber-500 to-orange-600'
+                        : 'bg-gradient-to-br from-sky-500 to-blue-600'
+                    }`}>
                       <p className="text-2xl sm:text-3xl font-bold text-white">{booking.tokenNumber}</p>
-                      <p className="text-[10px] sm:text-xs text-sky-100 mt-1 font-semibold">Your Token</p>
+                      <p className="text-[10px] sm:text-xs text-white/90 mt-1 font-semibold">
+                        {booking.isRecalled ? '🔁 Your Token' : 'Your Token'}
+                      </p>
+                      {booking.isRecalled && booking.recallCount > 0 && (
+                        <p className="text-[8px] sm:text-[10px] text-white/80 mt-0.5">
+                          Recalled {booking.recallCount}x
+                        </p>
+                      )}
                     </div>
 
-                    {/* Current Token */}
-                    <div className="bg-white rounded-xl p-3 text-center border-2 border-blue-200 col-span-1">
-                      <p className="text-xl sm:text-2xl font-bold text-blue-600">{booking.queueStatus.currentToken}</p>
-                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Current</p>
+                    {/* Current Token - Shows if it's a recall */}
+                    <div className={`bg-white rounded-xl p-3 text-center shadow-sm col-span-1 ${
+                      booking.queueStatus.isCurrentTokenRecalled
+                        ? 'border-2 border-amber-400 ring-2 ring-amber-200'
+                        : 'border-2 border-blue-200'
+                    }`}>
+                      <div className="flex items-center justify-center gap-1">
+                        {booking.queueStatus.isCurrentTokenRecalled && (
+                          <RefreshCw size={12} className="text-amber-600 animate-spin" />
+                        )}
+                        <p className={`text-xl sm:text-2xl font-bold ${
+                          booking.queueStatus.isCurrentTokenRecalled ? 'text-amber-600' : 'text-blue-600'
+                        }`}>
+                          {booking.queueStatus.currentToken}
+                        </p>
+                      </div>
+                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">
+                        {booking.queueStatus.isCurrentTokenRecalled ? 'Recall' : 'Current'}
+                      </p>
                     </div>
 
-                    {/* Next Token */}
+                    {/* Total Called */}
                     <div className="bg-white rounded-xl p-3 text-center border-2 border-green-200 col-span-1">
-                      <p className="text-xl sm:text-2xl font-bold text-green-600">{booking.queueStatus.currentToken + 1}</p>
-                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Next</p>
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">
+                        {booking.queueStatus.totalTokensCalled || booking.queueStatus.completedToday}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Called</p>
                     </div>
 
                     {/* Wait Time */}
@@ -696,8 +724,53 @@ export default function BookingStatusPage() {
                     </div>
                   </div>
 
+                  {/* Recall Alert Banner */}
+                  {booking.queueStatus.isCurrentTokenRecalled && (
+                    <motion.div
+                      className="p-3 bg-gradient-to-r from-amber-400 to-orange-500 rounded-xl text-white shadow-lg"
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <RefreshCw size={18} className="flex-shrink-0 mt-0.5 animate-spin" />
+                        <div className="flex-1">
+                          <p className="text-sm font-bold mb-1">🔁 Token Being Recalled</p>
+                          <p className="text-xs opacity-95">
+                            Token #{booking.queueStatus.currentToken} is being called again as the patient didn't show up initially.
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* User's Token Recalled Alert */}
+                  {booking.isRecalled && booking.queueStatus.queuePosition === 'current' && (
+                    <motion.div
+                      className="p-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl text-white shadow-lg"
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <Bell size={18} className="flex-shrink-0 mt-0.5 animate-bounce" />
+                        <div className="flex-1">
+                          <p className="text-sm font-bold mb-1">⚠️ FINAL CALL - Token #{booking.tokenNumber}</p>
+                          <p className="text-xs opacity-95">
+                            Your token has been recalled. Please proceed to consultation room IMMEDIATELY or your appointment may be marked as no-show.
+                          </p>
+                          {booking.recallCount > 1 && (
+                            <p className="text-xs mt-1 font-bold">
+                              This is recall #{booking.recallCount} - Final chance!
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* Dynamic Status Alert - Real-time Updates */}
-                  {booking.queueStatus.queuePosition === 'current' ? (
+                  {booking.queueStatus.queuePosition === 'current' && !booking.isRecalled ? (
                     // User's turn - status dependent
                     <>
                       {booking.doctor?.status === 'on_break' && booking.doctor?.breakType === 'timed' && booking.doctor?.breakEndTime ? (

@@ -23,6 +23,16 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
+// Helper function to convert 24hr to 12hr format
+const convertTo12Hour = (time24) => {
+  if (!time24) return '';
+  const [hours, minutes] = time24.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+};
+
 export default function AppointmentBookingModal({ doctor, session, timeSlot, onClose }) {
   const [bookingData, setBookingData] = useState({
     appointmentDate: '',
@@ -130,9 +140,23 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
   const calculateTokenPrediction = async () => {
     setIsCalculating(true);
     setError(null);
-    
+
     if (!bookingData.appointmentDate) {
       setError('Please select an appointment date first');
+      setIsCalculating(false);
+      return;
+    }
+
+    // Check if session has ended for today
+    if (isSessionEndedToday(bookingData.appointmentDate)) {
+      setError(`Session has ended for today (ended at ${convertTo12Hour(session.endTime)}). Please select a future date.`);
+      setIsCalculating(false);
+      return;
+    }
+
+    // Check if it's too late to book for today
+    if (isTooLateToBookToday(bookingData.appointmentDate)) {
+      setError(`Too late to book for today. Session ends at ${convertTo12Hour(session.endTime)}. Please select a future date.`);
       setIsCalculating(false);
       return;
     }
@@ -140,7 +164,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
     // Validate date is available for this session
     const selectedDate = new Date(bookingData.appointmentDate);
     const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
-    
+
     if (session.dayOfWeek !== dayOfWeek) {
       setError(`Doctor is not available on ${dayOfWeek}. Available on ${session.dayOfWeek}`);
       setIsCalculating(false);
@@ -227,22 +251,24 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
       time = actualTime;
     }
 
-    if (!date || !time) return time;
+    if (!date || !time) return convertTo12Hour(time);
 
     const selectedDate = new Date(date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     selectedDate.setHours(0, 0, 0, 0);
 
+    const time12hr = convertTo12Hour(time);
+
     if (selectedDate.getTime() === today.getTime()) {
-      return `Today at ${time}`;
+      return `Today at ${time12hr}`;
     } else {
       const dateStr = selectedDate.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric'
       });
-      return `${dateStr} at ${time}`;
+      return `${dateStr} at ${time12hr}`;
     }
   };
 
@@ -281,9 +307,55 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
     return convertMinutesToTime(estimatedMinutes);
   };
 
+  // Check if session has ended for today
+  const isSessionEndedToday = (selectedDate) => {
+    const today = new Date();
+    const appointmentDate = new Date(selectedDate);
+
+    // Set hours to 0 for date comparison
+    today.setHours(0, 0, 0, 0);
+    appointmentDate.setHours(0, 0, 0, 0);
+
+    // Only check if selected date is today
+    if (appointmentDate.getTime() !== today.getTime()) {
+      return false;
+    }
+
+    // Parse session end time
+    const [endHours, endMinutes] = session.endTime.split(':').map(Number);
+    const now = new Date();
+    const sessionEnd = new Date();
+    sessionEnd.setHours(endHours, endMinutes, 0, 0);
+
+    // Session has ended if current time is past session end time
+    return now > sessionEnd;
+  };
+
+  // Check if it's too late to book for today (less than 30 minutes before session end)
+  const isTooLateToBookToday = (selectedDate) => {
+    const today = new Date();
+    const appointmentDate = new Date(selectedDate);
+
+    today.setHours(0, 0, 0, 0);
+    appointmentDate.setHours(0, 0, 0, 0);
+
+    if (appointmentDate.getTime() !== today.getTime()) {
+      return false;
+    }
+
+    const [endHours, endMinutes] = session.endTime.split(':').map(Number);
+    const now = new Date();
+    const sessionEnd = new Date();
+    sessionEnd.setHours(endHours, endMinutes, 0, 0);
+
+    const thirtyMinutesBefore = new Date(sessionEnd.getTime() - 30 * 60 * 1000);
+
+    return now > thirtyMinutesBefore;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!bookingData.appointmentDate) {
       setError('Please select an appointment date');
       return;
@@ -298,9 +370,21 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
     const selectedDate = new Date(bookingData.appointmentDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     if (selectedDate < today) {
       setError('Please select a future date');
+      return;
+    }
+
+    // Check if session has ended for today
+    if (isSessionEndedToday(bookingData.appointmentDate)) {
+      setError(`Session has ended for today (ended at ${convertTo12Hour(session.endTime)}). Please select a future date.`);
+      return;
+    }
+
+    // Check if it's too late to book for today
+    if (isTooLateToBookToday(bookingData.appointmentDate)) {
+      setError(`Too late to book for today. Session ends at ${convertTo12Hour(session.endTime)}. Please select a future date.`);
       return;
     }
 
@@ -503,7 +587,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                 <div className="flex items-center gap-2">
                   <Clock size={14} className="text-slate-500 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span className="text-xs sm:text-sm text-slate-600">
-                    {session.startTime} - {session.endTime}
+                    {convertTo12Hour(session.startTime)} - {convertTo12Hour(session.endTime)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -583,7 +667,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400"
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Doctor is available on {session.dayOfWeek}s from {session.startTime} to {session.endTime}
+                  Doctor is available on {session.dayOfWeek}s from {convertTo12Hour(session.startTime)} to {convertTo12Hour(session.endTime)}
                 </p>
                 
                 {/* Quick Date Selection */}
@@ -806,7 +890,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                                     {token.tokenNumber}
                                   </div>
                                   <div className="text-[10px] mt-0.5 opacity-75">
-                                    {token.estimatedTime}
+                                    {convertTo12Hour(token.estimatedTime)}
                                   </div>
                                 </div>
                                 {!token.isAvailable && (
@@ -911,7 +995,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
                       </div>
                       <div>
                         <span className="text-slate-600">Estimated Time:</span>
-                        <div className="font-bold text-lg">{predictedToken.estimatedDateTime || predictedToken.estimatedTime}</div>
+                        <div className="font-bold text-lg">{predictedToken.estimatedDateTime || convertTo12Hour(predictedToken.estimatedTime)}</div>
                       </div>
                       {predictedToken.availableTokens !== undefined && (
                         <div className="sm:col-span-2">
