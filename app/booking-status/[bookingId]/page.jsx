@@ -154,7 +154,7 @@ export default function BookingStatusPage() {
 
     const interval = setInterval(() => {
       fetchBookingStatus(true); // Silent refresh
-    }, 30000); // Refresh every 30 seconds
+    }, 5000); // Refresh every 5 seconds
 
     return () => clearInterval(interval);
   }, [booking, autoRefresh]);
@@ -719,7 +719,7 @@ export default function BookingStatusPage() {
               {booking.isToday && booking.queueStatus && ['confirmed', 'pending'].includes(booking.status) && (
                 <div className="space-y-3">
                   {/* Token Grid - Compact */}
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {/* Your Token */}
                     <div className={`rounded-xl p-3 text-center shadow-lg col-span-1 ${
                       booking.isRecalled
@@ -758,18 +758,45 @@ export default function BookingStatusPage() {
                       </p>
                     </div>
 
-                    {/* Total Called */}
-                    <div className="bg-white rounded-xl p-3 text-center border-2 border-green-200 col-span-1">
-                      <p className="text-xl sm:text-2xl font-bold text-green-600">
-                        {booking.queueStatus.totalTokensCalled || booking.queueStatus.completedToday}
+                    {/* Unique Tokens Called */}
+                    <div className="bg-white rounded-xl p-3 text-center border-2 border-indigo-200 col-span-1">
+                      <p className="text-xl sm:text-2xl font-bold text-indigo-600">
+                        {booking.queueStatus.uniqueTokensCalled || booking.queueStatus.processedToday || 0}
                       </p>
                       <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Called</p>
                     </div>
 
+                    {/* Completed (Successful Consultations) */}
+                    <div className="bg-white rounded-xl p-3 text-center border-2 border-green-200 col-span-1">
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">
+                        {booking.queueStatus.completedToday || 0}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Done</p>
+                    </div>
+                  </div>
+
+                  {/* Additional Stats Row */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* No-Shows */}
+                    {booking.queueStatus.noShowToday > 0 && (
+                      <div className="bg-red-50 rounded-lg p-2 text-center border border-red-200">
+                        <p className="text-sm font-bold text-red-600">{booking.queueStatus.noShowToday}</p>
+                        <p className="text-[9px] text-red-700">No-Shows</p>
+                      </div>
+                    )}
+
+                    {/* Total Calls (including recalls) */}
+                    {booking.queueStatus.totalTokensCalled > booking.queueStatus.uniqueTokensCalled && (
+                      <div className="bg-amber-50 rounded-lg p-2 text-center border border-amber-200">
+                        <p className="text-sm font-bold text-amber-600">{booking.queueStatus.totalTokensCalled}</p>
+                        <p className="text-[9px] text-amber-700">Total Calls</p>
+                      </div>
+                    )}
+
                     {/* Wait Time */}
-                    <div className="bg-white rounded-xl p-3 text-center border-2 border-purple-200 col-span-1">
-                      <p className="text-xl sm:text-2xl font-bold text-purple-600">{booking.queueStatus.estimatedWaitingMinutes}</p>
-                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Mins</p>
+                    <div className="bg-purple-50 rounded-lg p-2 text-center border border-purple-200">
+                      <p className="text-sm font-bold text-purple-600">{booking.queueStatus.estimatedWaitingMinutes} min</p>
+                      <p className="text-[9px] text-purple-700">Est. Wait</p>
                     </div>
                   </div>
 

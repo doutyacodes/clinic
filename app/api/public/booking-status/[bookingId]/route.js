@@ -78,9 +78,19 @@ export async function GET(request, { params }) {
       // Filter active appointments (not cancelled)
       const activeAppointments = todaysAppointments.filter(apt => apt.status !== 'cancelled');
 
-      // Calculate current token being served
+      // Calculate COMPLETED appointments (actually finished consultations)
       const completedAppointments = activeAppointments.filter(apt =>
-        apt.status === 'completed' || apt.actualEndTime
+        apt.status === 'completed'
+      );
+
+      // Calculate NO-SHOW appointments (missed/skipped)
+      const noShowAppointments = activeAppointments.filter(apt =>
+        apt.status === 'no_show' || apt.missedAppointment
+      );
+
+      // Calculate PROCESSED appointments (completed + no-shows = all that were called and handled)
+      const processedAppointments = activeAppointments.filter(apt =>
+        apt.status === 'completed' || apt.status === 'no_show'
       );
 
       const currentlyServing = activeAppointments.find(apt =>
@@ -92,8 +102,8 @@ export async function GET(request, { params }) {
 
       if (!currentToken) {
         currentToken = currentlyServing?.tokenNumber ||
-                      (completedAppointments.length > 0 ?
-                       Math.max(...completedAppointments.map(apt => apt.tokenNumber)) + 1 : 1);
+                      (processedAppointments.length > 0 ?
+                       Math.max(...processedAppointments.map(apt => apt.tokenNumber)) + 1 : 1);
       }
 
       // Check if current token is a recall by querying tokenCallHistory
@@ -124,8 +134,8 @@ export async function GET(request, { params }) {
         }
       }
 
-      // Count total tokens called (including recalls)
-      let totalTokensCalled = completedAppointments.length;
+      // Count total tokens called (including recalls) from tokenCallHistory
+      let totalTokensCalled = processedAppointments.length; // Fallback: completed + no-shows
       try {
         const callHistoryCount = await db.select({
           count: sql`COUNT(*)`,
@@ -140,6 +150,25 @@ export async function GET(request, { params }) {
         }
       } catch (historyError) {
         console.warn('Token call count query failed:', historyError.message);
+        // Fallback already set above
+      }
+
+      // Count total UNIQUE tokens called (in case a token was recalled multiple times)
+      let uniqueTokensCalled = processedAppointments.length;
+      try {
+        const uniqueCallHistory = await db.select({
+          count: sql`COUNT(DISTINCT ${tokenCallHistory.tokenNumber})`,
+        }).from(tokenCallHistory)
+          .where(and(
+            eq(tokenCallHistory.sessionId, booking.sessionId),
+            eq(tokenCallHistory.appointmentDate, booking.appointmentDate)
+          ));
+
+        if (uniqueCallHistory && uniqueCallHistory[0]) {
+          uniqueTokensCalled = Number(uniqueCallHistory[0].count);
+        }
+      } catch (historyError) {
+        console.warn('Unique token call count query failed:', historyError.message);
       }
 
       // Get average wait time from queuePositions table
@@ -179,8 +208,11 @@ export async function GET(request, { params }) {
           hour12: true
         }),
         totalTokensToday: activeAppointments.length,
-        completedToday: completedAppointments.length,
-        totalTokensCalled,
+        completedToday: completedAppointments.length, // Only successfully completed consultations
+        noShowToday: noShowAppointments.length, // Missed appointments
+        processedToday: processedAppointments.length, // Completed + No-shows (total handled)
+        totalTokensCalled, // Total calls including recalls (e.g., 12 if token #3 was called 3 times)
+        uniqueTokensCalled, // Unique tokens called (e.g., 10 if 10 different tokens were called)
         currentlyServing: currentlyServing?.tokenNumber || null,
         queuePosition: booking.tokenNumber <= currentToken ? 'current' : 'waiting',
         isCurrentTokenRecalled,
