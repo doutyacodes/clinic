@@ -606,20 +606,20 @@ export default function BookingsPage() {
 
                       {/* Actions */}
                       <div className="flex lg:flex-col gap-2 lg:w-40">
-                        <Link href={`/booking-status/${booking.id}`}>
-                        <motion.button
-                          onClick={() => router.push(`/booking-status/${booking.id}`)}
-                          className="flex-1 lg:w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white px-3 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm touch-manipulation min-h-[44px]"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                        <Link
+                          href={`/booking-status/${booking.id}`}
+                          className="flex-1 lg:w-full"
                         >
-                          <Eye size={18} className="flex-shrink-0" />
-                          <span>View Details</span>
-                        </motion.button>
+                          <button
+                            className="w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white px-4 py-3 rounded-xl font-semibold hover:shadow-lg active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 text-sm touch-manipulation min-h-[44px]"
+                          >
+                            <Eye size={18} className="flex-shrink-0" />
+                            <span>View Details</span>
+                          </button>
                         </Link>
 
                         {booking.payment?.status === 'completed' && (
-                          <motion.button
+                          <button
                             onClick={async () => {
                               try {
                                 const response = await fetch(`/api/appointments/receipt/${booking.id}`);
@@ -641,13 +641,11 @@ export default function BookingsPage() {
                                 alert('Failed to download receipt');
                               }
                             }}
-                            className="flex-1 lg:w-full border-2 border-purple-300 text-purple-600 px-3 py-3 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-200 flex items-center justify-center gap-2 text-sm touch-manipulation min-h-[44px]"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                            className="flex-1 lg:w-full border-2 border-purple-300 text-purple-600 px-4 py-3 rounded-xl font-semibold hover:bg-purple-50 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 text-sm touch-manipulation min-h-[44px]"
                           >
                             <Download size={18} className="flex-shrink-0" />
                             <span>Receipt</span>
-                          </motion.button>
+                          </button>
                         )}
                       </div>
                     </div>
