@@ -115,6 +115,25 @@ function BreakTimerBox({ doctorName, breakEndTime, breakType }) {
   return null;
 }
 
+// Emergency Status Box Component (matching Break UI style)
+function EmergencyStatusBox({ doctorName }) {
+  return (
+    <motion.div
+      className="p-3 bg-gradient-to-r from-red-500 to-rose-600 rounded-xl text-white"
+      initial={{ scale: 0.95 }}
+      animate={{ scale: 1 }}
+    >
+      <div className="flex items-center gap-2">
+        <Siren size={18} />
+        <div className="flex-1">
+          <p className="text-sm font-bold">Medical Emergency - Indefinite</p>
+          <p className="text-xs opacity-90">Will resume when emergency is resolved</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function BookingStatusPage() {
   const [booking, setBooking] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -655,10 +674,7 @@ export default function BookingStatusPage() {
                         // Session is active - show doctor status
                         <div className="space-y-2">
                           {doctorStatus === 'emergency' ? (
-                            <div className="flex items-center gap-2 text-xs">
-                              <Siren size={14} className="text-red-600 animate-pulse" />
-                              <span className="text-red-700 font-bold">🚨 Medical Emergency - Delays Expected</span>
-                            </div>
+                            <EmergencyStatusBox doctorName={booking.doctor.name} />
                           ) : doctorStatus === 'on_break' && booking.doctor?.breakType === 'timed' && booking.doctor?.breakEndTime ? (
                             <BreakTimerBox
                               doctorName={booking.doctor.name}
@@ -758,33 +774,17 @@ export default function BookingStatusPage() {
                       </p>
                     </div>
 
-                    {/* Unique Tokens Called */}
-                    <div className="bg-white rounded-xl p-3 text-center border-2 border-indigo-200 col-span-1">
-                      <p className="text-xl sm:text-2xl font-bold text-indigo-600">
-                        {booking.queueStatus.uniqueTokensCalled || booking.queueStatus.processedToday || 0}
+                    {/* Total Tokens (Completed + No Show) */}
+                    <div className="bg-white rounded-xl p-3 text-center border-2 border-purple-200 col-span-2">
+                      <p className="text-xl sm:text-2xl font-bold text-purple-600">
+                        {booking.queueStatus.processedToday || 0}
                       </p>
-                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Called</p>
-                    </div>
-
-                    {/* Completed (Successful Consultations) */}
-                    <div className="bg-white rounded-xl p-3 text-center border-2 border-green-200 col-span-1">
-                      <p className="text-xl sm:text-2xl font-bold text-green-600">
-                        {booking.queueStatus.completedToday || 0}
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Done</p>
+                      <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Total Tokens</p>
                     </div>
                   </div>
 
                   {/* Additional Stats Row */}
-                  <div className="grid grid-cols-3 gap-2">
-                    {/* No-Shows */}
-                    {booking.queueStatus.noShowToday > 0 && (
-                      <div className="bg-red-50 rounded-lg p-2 text-center border border-red-200">
-                        <p className="text-sm font-bold text-red-600">{booking.queueStatus.noShowToday}</p>
-                        <p className="text-[9px] text-red-700">No-Shows</p>
-                      </div>
-                    )}
-
+                  <div className="grid grid-cols-2 gap-2">
                     {/* Total Calls (including recalls) */}
                     {booking.queueStatus.totalTokensCalled > booking.queueStatus.uniqueTokensCalled && (
                       <div className="bg-amber-50 rounded-lg p-2 text-center border border-amber-200">
@@ -870,19 +870,7 @@ export default function BookingStatusPage() {
                           </div>
                         </motion.div>
                       ) : booking.doctor?.status === 'emergency' ? (
-                        <motion.div
-                          className="p-3 bg-gradient-to-r from-red-500 to-rose-600 rounded-xl text-white"
-                          initial={{ scale: 0.95 }}
-                          animate={{ scale: 1 }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Siren size={20} className="animate-pulse" />
-                            <div className="flex-1">
-                              <p className="text-sm font-bold">🚨 Medical Emergency</p>
-                              <p className="text-xs opacity-90">It's your turn, but doctor is handling emergency. Please wait.</p>
-                            </div>
-                          </div>
-                        </motion.div>
+                        <EmergencyStatusBox doctorName={booking.doctor.name} />
                       ) : booking.doctor?.status === 'offline' ? (
                         <motion.div
                           className="p-3 bg-gradient-to-r from-slate-500 to-slate-600 rounded-xl text-white"
@@ -937,19 +925,7 @@ export default function BookingStatusPage() {
                           </div>
                         </motion.div>
                       ) : booking.doctor?.status === 'emergency' ? (
-                        <motion.div
-                          className="p-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl text-white"
-                          initial={{ scale: 0.95 }}
-                          animate={{ scale: 1 }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Siren size={18} className="animate-pulse" />
-                            <div className="flex-1">
-                              <p className="text-sm font-bold">⚠️ Medical Emergency</p>
-                              <p className="text-xs opacity-90">Expect delays. {booking.queueStatus.tokensAhead} ahead of you.</p>
-                            </div>
-                          </div>
-                        </motion.div>
+                        <EmergencyStatusBox doctorName={booking.doctor.name} />
                       ) : (
                         <motion.div
                           className="p-3 bg-gradient-to-r from-slate-400 to-slate-500 rounded-xl text-white"

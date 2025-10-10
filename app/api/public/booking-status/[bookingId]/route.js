@@ -97,13 +97,15 @@ export async function GET(request, { params }) {
         apt.actualStartTime && !apt.actualEndTime && apt.status !== 'completed'
       );
 
-      // Calculate current token (use session's currentToken if available, fallback to calculation)
-      let currentToken = booking.session?.currentTokenNumber || 0;
+      // Calculate current token (use session's currentToken which is set by doctor's call system)
+      // IMPORTANT: This is the EXACT token being called, not the next one
+      let currentToken = booking.session?.currentToken || 0;
 
       if (!currentToken) {
+        // Fallback calculation if session.currentToken is not set
         currentToken = currentlyServing?.tokenNumber ||
                       (processedAppointments.length > 0 ?
-                       Math.max(...processedAppointments.map(apt => apt.tokenNumber)) + 1 : 1);
+                       Math.max(...processedAppointments.map(apt => apt.tokenNumber)) : 0);
       }
 
       // Check if current token is a recall by querying tokenCallHistory
