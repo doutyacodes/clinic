@@ -774,10 +774,12 @@ export default function BookingStatusPage() {
                       </p>
                     </div>
 
-                    {/* Total Tokens (Completed + No Show) */}
+                    {/* Total Tokens (Processed / Total Booked) */}
                     <div className="bg-white rounded-xl p-3 text-center border-2 border-purple-200 col-span-2">
                       <p className="text-xl sm:text-2xl font-bold text-purple-600">
                         {booking.queueStatus.processedToday || 0}
+                        <span className="text-slate-400 mx-1">/</span>
+                        {booking.queueStatus.totalTokensToday || 0}
                       </p>
                       <p className="text-[10px] sm:text-xs text-slate-600 mt-1">Total Tokens</p>
                     </div>
