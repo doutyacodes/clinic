@@ -491,7 +491,7 @@ export default function BookingStatusPage() {
   const DoctorStatusIcon = doctorStatusConfig.icon;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-6 sm:py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 pt-24 pb-8 sm:pt-28 sm:pb-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Animated Background */}
       <div className="absolute inset-0 opacity-30">
         <div className="absolute top-20 left-10 w-96 h-96 bg-sky-300 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
@@ -554,6 +554,17 @@ export default function BookingStatusPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
+              {/* Hospital Image - Top Banner */}
+              {booking.hospital?.image && (
+                <div className="mb-4 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6">
+                  <img
+                    src={booking.hospital.image}
+                    alt={booking.hospital.name}
+                    className="w-full h-32 sm:h-40 object-cover rounded-t-2xl"
+                  />
+                </div>
+              )}
+
               {/* Doctor Name - Most Prominent */}
               <div className="mb-4">
                 <h1 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-1">
@@ -1422,21 +1433,36 @@ export default function BookingStatusPage() {
           </div>
         </div>
 
-        {/* Last Updated */}
-        {lastUpdated && (
+        {/* Last Updated & Powered By */}
+        <div className="mt-6 space-y-2">
+          {lastUpdated && (
+            <motion.div
+              className="text-center text-sm text-slate-500"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              Last updated: {lastUpdated.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+              })}
+            </motion.div>
+          )}
+
+          {/* Powered by Medicare */}
           <motion.div
-            className="mt-6 text-center text-sm text-slate-500"
+            className="text-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
           >
-            Last updated: {lastUpdated.toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: true
-            })}
+            <p className="text-xs text-slate-400">
+              Powered by{' '}
+              <span className="font-semibold text-sky-600">Medicare</span>
+            </p>
           </motion.div>
-        )}
+        </div>
       </div>
 
       {/* Modify Modal */}
