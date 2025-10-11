@@ -12,6 +12,11 @@ const nextConfig = {
         hostname: "kottayammedicalcollege.org",
         pathname: "/**", // ✅ allow all paths from this domain
       },
+      {
+        protocol: "https",
+        hostname: "baberahma.com",
+        pathname: "/**", // ✅ allow all paths from this domain
+      },
     ],
   },
 };
