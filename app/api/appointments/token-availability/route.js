@@ -85,10 +85,13 @@ export async function GET(request) {
 
     // Generate token grid with availability status
     const tokens = [];
+    // Use avg_minutes_per_patient from doctor_sessions table, default to 10 minutes if not available
+    const avgMinutes = session.avgMinutesPerPatient || 10;
+
     for (let i = 1; i <= session.maxTokens; i++) {
       const isBooked = bookedTokens.includes(i);
       const isLocked = lockedTokens.includes(i);
-      const estimatedTime = calculateEstimatedTime(i, session.startTime, session.avgMinutesPerPatient);
+      const estimatedTime = calculateEstimatedTime(i, session.startTime, avgMinutes);
 
       let status = 'available';
       if (isBooked) {
@@ -125,7 +128,7 @@ export async function GET(request) {
       sessionInfo: {
         startTime: session.startTime,
         endTime: session.endTime,
-        avgMinutesPerPatient: session.avgMinutesPerPatient,
+        avgMinutesPerPatient: avgMinutes,
       }
     });
 

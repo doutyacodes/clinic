@@ -198,6 +198,7 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
             return;
           }
           estimatedTime = calculateEstimatedTime(tokenNumber);
+          console.log("estimatedTime",estimatedTime)
           estimatedDateTime = formatEstimatedDateTime(estimatedTime);
           break;
 
@@ -303,7 +304,9 @@ export default function AppointmentBookingModal({ doctor, session, timeSlot, onC
 
   const calculateEstimatedTime = (tokenNumber) => {
     const sessionStartMinutes = convertTimeToMinutes(session.startTime);
-    const estimatedMinutes = sessionStartMinutes + ((tokenNumber - 1) * (session.avgMinutesPerPatient || 15));
+    // Use avg_minutes_per_patient from doctor_sessions table, default to 10 minutes if not available
+    const avgMinutes = session.avgMinutesPerPatient || 10;
+    const estimatedMinutes = sessionStartMinutes + ((tokenNumber - 1) * avgMinutes);
     return convertMinutesToTime(estimatedMinutes);
   };
 
